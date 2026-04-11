@@ -51,6 +51,7 @@ const App = {
   template: `
     <div class="app-shell">
       <AppHeader />
+      <div class="header-banner"></div>
       <div class="main-view">
         <RouterView />
       </div>

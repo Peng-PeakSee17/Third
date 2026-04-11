@@ -1,5 +1,6 @@
 import {
   computed,
+  ref,
   reactive,
   watch
 } from 'vue';
@@ -40,6 +41,8 @@ export const AppHeader = {
       get: () => store.state.searchQuery,
       set: (value) => store.setSearchQuery(value)
     });
+    const showSearchPopup = ref(false);
+    const showMenu = ref(false);
 
     const navItems = [
       { label: 'HOME', sub: '主页', name: 'home' },
@@ -54,40 +57,83 @@ export const AppHeader = {
       router.push({ name });
     }
 
-    function goSearch() {
+    function toggleMenu() {
+      showMenu.value = !showMenu.value;
+    }
+
+    function closeMenu() {
+      showMenu.value = false;
+    }
+
+    function toggleSearchPopup() {
+      showSearchPopup.value = !showSearchPopup.value;
+    }
+
+    function onSearchFocus() {
+      showSearchPopup.value = true;
+    }
+
+    function onSearchBlur() {
+      setTimeout(() => {
+        showSearchPopup.value = false;
+      }, 200);
+    }
+
+    function onSearchSubmit() {
       if (router.currentRoute.value.name !== 'search') {
         router.push({ name: 'search' });
       }
+      showSearchPopup.value = false;
     }
 
-    return { store, route, navItems, go, searchModel, goSearch };
+    return { store, route, navItems, go, searchModel, goSearch: toggleSearchPopup, getInitial, showSearchPopup, onSearchFocus, onSearchBlur, onSearchSubmit, showMenu, toggleMenu, closeMenu };
   },
   template: `
     <header class="app-header">
       <div class="header-row-1">
-        <button class="menu-button">
-          <AppIcon name="menu" />
-        </button>
-        <div class="logo-block">
-          <img src="/images/Third_Logo.png" alt="Third" class="header-logo">
-          <span class="logo-text">Third</span>
+        <div class="header-left">
+          <button class="menu-button" @click="toggleMenu">
+            <AppIcon name="menu" />
+            <span class="menu-text">Menu</span>
+          </button>
         </div>
-        <div class="header-search">
-          <AppIcon name="search" />
-          <input
-            v-model="searchModel"
-            type="text"
-            placeholder="搜索..."
-            @focus="goSearch"
-          >
+        <div class="header-center">
+          <div class="logo-block">
+            <div class="logo-main">
+              <div class="logo-row">
+                <span class="logo-letter">T</span>
+                <span class="logo-dot"></span>
+                <span class="logo-letter">H</span>
+                <span class="logo-dot"></span>
+                <span class="logo-letter">I</span>
+                <span class="logo-dot"></span>
+                <span class="logo-letter">R</span>
+                <span class="logo-dot"></span>
+                <span class="logo-letter">D</span>
+              </div>
+            </div>
+            <div class="logo-sub">
+              <span>Talent</span>
+              <span>Humanities</span>
+              <span>Intelligence</span>
+              <span>Responsibility</span>
+              <span>Dream</span>
+            </div>
+          </div>
         </div>
-        <button v-if="!store.isLoggedIn" class="login-button" @click="store.openAuthModal('login')">
-          <AppIcon name="log-in" />
-          <span>登录</span>
-        </button>
-        <button v-else class="profile-button">
-          <span class="avatar-circle">{{ getInitial(store.state.currentUser?.username) }}</span>
-        </button>
+        <div class="header-right">
+          <div class="header-search">
+            <button class="header-search-btn" @click="goSearch">
+              <AppIcon name="search" />
+            </button>
+          </div>
+          <button v-if="!store.isLoggedIn" class="login-button" @click="store.openAuthModal('login')">
+            <span>LOG IN</span>
+          </button>
+          <button v-else class="login-button" @click="store.openAuthModal('login')">
+            <span>{{ store.state.currentUser?.username }}</span>
+          </button>
+        </div>
       </div>
 
       <nav class="header-row-2">
@@ -102,6 +148,46 @@ export const AppHeader = {
           <span class="nav-sub">{{ item.sub }}</span>
         </button>
       </nav>
+
+      <div v-if="showSearchPopup" class="search-popup">
+        <input
+          class="search-popup-input"
+          v-model="searchModel"
+          type="text"
+          placeholder="搜索..."
+          @focus="onSearchFocus"
+          @blur="onSearchBlur"
+          @keyup.enter="onSearchSubmit"
+        >
+      </div>
+
+      <div v-if="showMenu" class="menu-overlay" @click="closeMenu"></div>
+      <Teleport to="body">
+        <div v-if="showMenu" class="menu-sidebar">
+          <div class="menu-sidebar-header">
+            <button class="menu-login-btn" v-if="!store.isLoggedIn" @click="store.openAuthModal('login'); closeMenu()">
+              <AppIcon name="log-in" />
+              <span>登录 / 注册</span>
+            </button>
+            <button class="menu-login-btn logged-in" v-else>
+              <span class="avatar-circle">{{ getInitial(store.state.currentUser?.username) }}</span>
+              <span>{{ store.state.currentUser?.username }}</span>
+            </button>
+          </div>
+          <nav class="menu-sidebar-nav">
+            <button
+              v-for="item in navItems"
+              :key="item.name"
+              class="menu-nav-item"
+              :class="{ active: route.name === item.name }"
+              @click="go(item.name); closeMenu()"
+            >
+              <span class="menu-nav-label">{{ item.label }}</span>
+              <span class="menu-nav-sub">{{ item.sub }}</span>
+            </button>
+          </nav>
+        </div>
+      </Teleport>
     </header>
   `
 };
