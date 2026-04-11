@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学术垃圾收容所</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-brand">
+          <img src="/images/Third_Logo.png" alt="logo" class="topbar-logo">
+        </div>
+        <div class="topbar-search">
+          <i data-lucide="search" class="search-icon"></i>
+          <input type="text" id="searchInput" placeholder="搜索学术垃圾..." />
+        </div>
+        <button class="btn-login" id="loginBtn">
+          <i data-lucide="user"></i>
+          <span>登录</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Layout -->
+    <div class="layout">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <img src="/images/Third_Logo.png" alt="学术垃圾收容所" class="sidebar-logo-img">
+        </div>
+        <nav class="sidebar-nav" id="sidebarNav">
+          <a href="#" class="nav-item active" data-page="home">
+            <i data-lucide="home"></i>
+            <span>首页</span>
+          </a>
+          <a href="#" class="nav-item" data-page="discover">
+            <i data-lucide="compass"></i>
+            <span>发现</span>
+          </a>
+          <a href="#" class="nav-item" data-page="trash">
+            <i data-lucide="trash-2"></i>
+            <span>回收站</span>
+          </a>
+          <a href="#" class="nav-item" data-page="search">
+            <i data-lucide="search"></i>
+            <span>搜索</span>
+          </a>
+          <a href="#" class="nav-item" id="sidebarLoginBtn">
+            <i data-lucide="log-in"></i>
+            <span>登录</span>
+          </a>
+        </nav>
+        <div class="sidebar-user" id="sidebarUser" style="display:none">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <div class="user-info">
+            <span class="user-name" id="userName">User</span>
+            <span class="user-inst" id="userInst">-</span>
+          </div>
+          <button class="btn-logout" id="logoutBtn" title="退出">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Tab Bar -->
+        <div class="tabbar">
+          <div class="tab-indicator" id="tabIndicator"></div>
+          <button class="tab-item active" data-tab="latest">最新</button>
+          <button class="tab-item" data-tab="hot">热门</button>
+          <button class="tab-item" data-tab="favorite">收藏</button>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="content-grid" id="contentGrid">
+          <!-- Cards injected by JS -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display:none">
+          <div class="empty-icon">🗑️</div>
+          <p>这里空空如也，快来发表第一篇学术垃圾吧！</p>
+        </div>
+      </main>
+    </div>
+
+    <!-- FAB -->
+    <button class="fab" id="fabBtn" title="发表新垃圾">
+      <i data-lucide="plus"></i>
+    </button>
+
+    <!-- Auth Modal -->
+    <div class="modal-overlay" id="authModal">
+      <div class="modal-card">
+        <button class="modal-close" id="authModalClose">
+          <i data-lucide="x"></i>
+        </button>
+        <h2 class="modal-title" id="authModalTitle">登录</h2>
+        <form id="authForm">
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" id="authUsername" placeholder="随便起个学术昵称" required>
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="authPassword" placeholder="别太简单被人破解了" required>
+          </div>
+          <div class="form-group" id="instGroup" style="display:none">
+            <label>所属机构</label>
+            <input type="text" id="authInstitution" placeholder="如：清华技校、青鸟职业学院">
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-switch" id="authSwitch">注册</button>
+            <button type="submit" class="btn-submit">确认</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Publish Modal -->
+    <div class="modal-overlay" id="publishModal">
+      <div class="modal-card modal-large">
+        <button class="modal-close" id="publishModalClose">
+          <i data-lucide="x"></i>
+        </button>
+        <h2 class="modal-title">📦 投放垃圾</h2>
+        <form id="publishForm">
+          <div class="form-group">
+            <label>标题</label>
+            <input type="text" id="publishTitle" placeholder="给垃圾起个正经名字" required>
+          </div>
+          <div class="form-group">
+            <label>内容</label>
+            <textarea id="publishContent" rows="8" placeholder="这里是学术垃圾的具体内容..." required></textarea>
+          </div>
+          <div class="form-group">
+            <label>标签（用逗号分隔）</label>
+            <input type="text" id="publishTags" placeholder="论文, 作业, 笔记...">
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-submit">投放</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Post Detail Modal -->
+    <div class="modal-overlay" id="postModal">
+      <div class="modal-card modal-large">
+        <button class="modal-close" id="postModalClose">
+          <i data-lucide="x"></i>
+        </button>
+        <div id="postDetailContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/src/app.js" type="module"></script>
+</body>
+</html>
