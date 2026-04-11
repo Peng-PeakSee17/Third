@@ -172,7 +172,7 @@ async function handlePublish(e) {
   const tags = document.getElementById('publishTags').value.split(',').map(t => t.trim()).filter(Boolean);
 
   try {
-    const res = await fetch(API + '/posts', {
+    const res = await fetch(`${API}/posts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ title, content, tags })
@@ -238,7 +238,7 @@ async function loadPosts(search = '') {
     grid.querySelectorAll('.btn-fav').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        toggleFavorite(btn.dataset.id, btn);
+        toggleFavorite(btn.dataset.id);
       });
     });
   } catch (err) {
@@ -292,10 +292,10 @@ function getPostEmoji(tags) {
   return '🗂️';
 }
 
-async function toggleFavorite(postId, btn) {
+async function toggleFavorite(postId) {
   if (!currentUser) { openAuthModal(); return; }
   try {
-    const res = await fetch(`${API}/posts/${postId}/favorite`, {
+    const res = await fetch(`${API}/posts/favorite/${postId}`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -348,7 +348,7 @@ function openPost(id) {
 
 window.toggleFavPost = async function(postId, btn) {
   if (!currentUser) { closePostModal(); openAuthModal(); return; }
-  await fetch(`${API}/posts/${postId}/favorite`, {
+  await fetch(`${API}/posts/favorite/${postId}`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` }
   });
