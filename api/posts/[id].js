@@ -7,7 +7,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'GET') {
-    const post = getPostById(req.query.id || req.url.split('/').pop());
+    const post = await getPostById(req.query.id || req.url.split('/').pop());
     if (!post) return res.status(404).json({ error: '文章不存在' });
     return res.status(200).json({ post });
   }

@@ -1,4 +1,3 @@
-// Redis store for server-side rendering / Express
 const { Redis } = require('@upstash/redis');
 
 const redis = new Redis({
@@ -131,15 +130,48 @@ async function toggleFavorite(postId, userId) {
   return post;
 }
 
-function getUsers() { return []; }
-function getUserByUsername(username) { return null; }
-function getUserById(id) { return null; }
-function addUser(user) { return user; }
-function addFavorite(userId, postId) { return []; }
-function removeFavorite(userId, postId) { return []; }
+async function getUserFavorites(userId) {
+  try {
+    const favorites = await redis.get(`third:favorites:${userId}`);
+    return favorites ? JSON.parse(favorites) : [];
+  } catch (e) {
+    console.error('获取收藏失败:', e);
+    return [];
+  }
+}
+
+async function addFavorite(userId, postId) {
+  try {
+    const favorites = await getUserFavorites(userId);
+    if (!favorites.includes(postId)) {
+      favorites.push(postId);
+      await redis.set(`third:favorites:${userId}`, JSON.stringify(favorites));
+    }
+    return favorites;
+  } catch (e) {
+    console.error('添加收藏失败:', e);
+    return [];
+  }
+}
+
+async function removeFavorite(userId, postId) {
+  try {
+    const favorites = await getUserFavorites(userId);
+    const filtered = favorites.filter(id => id !== postId);
+    await redis.set(`third:favorites:${userId}`, JSON.stringify(filtered));
+    return filtered;
+  } catch (e) {
+    console.error('删除收藏失败:', e);
+    return [];
+  }
+}
 
 module.exports = {
-  getPosts, getPostById, addPost, toggleFavorite,
-  getUsers, getUserByUsername, getUserById, addUser,
-  addFavorite, removeFavorite
+  getPosts,
+  getPostById,
+  addPost,
+  toggleFavorite,
+  getUserFavorites,
+  addFavorite,
+  removeFavorite
 };

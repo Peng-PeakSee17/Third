@@ -1,29 +1,14 @@
-const { getPosts, getPostById, addPost } = require('../store');
+const { getPosts, addPost } = require('../store');
 
-// Helper to get auth user from header
-function getAuthUser(req) {
+// Helper to get auth user from header (async)
+async function getAuthUser(req) {
   try {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) return null;
     const jwt = require('jsonwebtoken');
     const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
     const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
-    const { getUserById } = require('../store');
-    return getUserById(decoded.userId);
-  } catch {
-    return null;
-  }
-}
-
-function getAuthUser(req) {
-  try {
-    const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith('Bearer ')) return null;
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
-    const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
-    const { getUserById } = require('../store');
-    return getUserById(decoded.userId);
+    return { id: decoded.userId, username: decoded.username };
   } catch {
     return null;
   }
@@ -36,7 +21,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'POST') {
-    const user = getAuthUser(req);
+    const user = await getAuthUser(req);
     if (!user) return res.status(401).json({ error: '未登录' });
 
     const { title, content, tags } = req.body || {};
@@ -55,14 +40,13 @@ module.exports = async (req, res) => {
       views: 0,
       createdAt: new Date().toISOString()
     };
-    const { addPost } = require('../store');
-    addPost(post);
+    await addPost(post);
     return res.status(200).json({ post });
   }
 
   if (req.method === 'GET') {
     const { tab, search } = req.query;
-    let posts = getPosts();
+    let posts = await getPosts();
 
     if (tab === 'hot') {
       posts = [...posts].sort((a, b) => (b.comments + b.stars * 2) - (a.comments + a.stars * 2));

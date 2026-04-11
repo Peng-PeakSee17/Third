@@ -1,4 +1,4 @@
-const { getPosts, getUserById } = require('../../store');
+const { getPosts, getUserFavorites } = require('../../store');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,13 +18,18 @@ module.exports = async (req, res) => {
     const jwt = require('jsonwebtoken');
     const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
     const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
-    const user = getUserById(decoded.userId);
-    if (!user) return res.status(404).json({ error: '用户不存在' });
+    const userId = decoded.userId;
 
-    const allPosts = getPosts();
-    const favorites = allPosts.filter(p => (p.favorites || []).includes(user.id));
-    return res.status(200).json({ posts: favorites });
+    // Get user's favorite post IDs from Redis
+    const favoriteIds = await getUserFavorites(userId);
+    
+    // Get all posts and filter by favorites
+    const allPosts = await getPosts();
+    const favorites = allPosts.filter(p => favoriteIds.includes(p.id));
+    
+    return res.status(200).json({ posts: favorites, favoriteIds });
   } catch (e) {
+    console.error('获取收藏失败:', e);
     return res.status(401).json({ error: 'Token 无效' });
   }
 };

@@ -1,4 +1,4 @@
-const { toggleFavorite } = require('../../../store');
+const { put } = require('@vercel/blob');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,6 +11,7 @@ module.exports = async (req, res) => {
   }
 
   try {
+    // Verify authentication
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
       return res.status(401).json({ error: '未登录' });
@@ -18,18 +19,28 @@ module.exports = async (req, res) => {
     const jwt = require('jsonwebtoken');
     const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
     const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
-    const userId = decoded.userId;
 
-    const id = req.query.id || req.url.split('/')[4];
-    const post = await toggleFavorite(id, userId);
-    if (!post) return res.status(404).json({ error: '文章不存在' });
+    // Get file from body
+    const { fileData, fileName, contentType } = req.body || {};
+    if (!fileData) {
+      return res.status(400).json({ error: '没有上传文件' });
+    }
 
-    return res.status(200).json({ 
-      favorites: post.favorites,
-      isFavorited: post.favorites.includes(userId)
+    const buffer = Buffer.from(fileData, 'base64');
+    const filename = `${Date.now()}-${fileName || 'upload'}`;
+    
+    const blob = await put(filename, buffer, {
+      access: 'private',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      contentType: contentType || 'application/octet-stream'
+    });
+    
+    return res.status(200).json({
+      url: blob.url,
+      downloadedUrl: blob.downloadUrl
     });
   } catch (e) {
-    console.error('收藏错误:', e);
-    return res.status(401).json({ error: 'Token 无效' });
+    console.error('上传错误:', e);
+    return res.status(500).json({ error: '上传失败' });
   }
 };
