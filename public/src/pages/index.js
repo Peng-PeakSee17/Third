@@ -1,5 +1,6 @@
 import { computed } from 'vue';
 import {
+  Banner,
   FeedTabs,
   HeroBanner,
   InsightPanel,
@@ -9,52 +10,167 @@ import {
 import { useAppStore } from '../store/appStore.js';
 
 const HomePage = {
-  components: { HeroBanner, StatsStrip, FeedTabs, PostGrid, InsightPanel },
+  components: { Banner, PostGrid },
   setup() {
     const store = useAppStore();
-    const emptyTitle = computed(() =>
-      store.state.activeFeed === 'favorite' && !store.isLoggedIn.value ? '登录后查看收藏' : '这个分区还没有内容'
-    );
-    const emptyDescription = computed(() =>
-      store.state.activeFeed === 'favorite' && !store.isLoggedIn.value
-        ? '先登录，再把喜欢的内容收进自己的垃圾柜。'
-        : '可以先切换 tab，或者直接发布一篇新内容。'
-    );
-
-    return { store, emptyTitle, emptyDescription };
+    const sortedPosts = computed(() => {
+      return [...store.state.allPosts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    });
+    const editorialPosts = computed(() => sortedPosts.value.slice(0, 4));
+    const latestPosts = computed(() => sortedPosts.value.slice(0, 6));
+    return { store, editorialPosts, latestPosts };
   },
   template: `
     <section class="view-shell">
-      <HeroBanner
-        badge="Home Feed"
-        title="把设计图先落成一套 Vue3 首页"
-        description="首页作为主工作台，包含头部信息、数据总览、内容 tab、推荐侧栏和详情弹层。当前先把结构完整搭好，后续我们再继续精修。"
-        primary-label="立即发布"
-        secondary-label="前往发现"
-        @primary="store.openPublishModal()"
-        @secondary="$router.push({ name: 'discover' })"
-      />
+      <Banner title="" subtitle="" variant="default" />
 
-      <StatsStrip :items="store.dashboardCards" />
-      <FeedTabs />
-
-      <section class="content-layout">
-        <div class="page-panel">
+      <section class="content-layout two-column">
+        <div class="column-main">
+          <div class="section-header">
+            <h2>社论</h2>
+            <span class="section-desc">精选内容</span>
+          </div>
           <PostGrid
-            :posts="store.state.feedPosts"
-            :loading="store.state.loadingFeed"
-            :empty-title="emptyTitle"
-            :empty-description="emptyDescription"
+            :posts="editorialPosts"
+            :loading="store.state.loadingAll"
+            empty-title="暂无社论内容"
+            empty-description="等待内容投稿..."
           />
         </div>
 
-        <InsightPanel
-          title="Trending Tags"
-          description="侧栏保留趋势标签和热度精选，方便继续迭代成更强的信息架构。"
-          :tags="store.trendingTags"
-          :posts="store.featuredPosts.slice(0, 2)"
-        />
+        <aside class="column-side">
+          <div class="section-header">
+            <h2>最新动态</h2>
+            <span class="section-desc">{{ new Date().toLocaleDateString() }}</span>
+          </div>
+          <div class="latest-list">
+            <article v-for="post in latestPosts" :key="post.id" class="latest-item" @click="store.openPost(post.id)">
+              <span class="latest-emoji">{{ post.title ? post.title.charAt(0) : '#' }}</span>
+              <div class="latest-content">
+                <strong>{{ post.title }}</strong>
+                <span>{{ post.author }}</span>
+              </div>
+            </article>
+          </div>
+        </aside>
       </section>
+    </section>
+  `
+};
+
+const NewsPage = {
+  components: { Banner, PostGrid, StatsStrip },
+  setup() {
+    const store = useAppStore();
+    const newsPosts = computed(() => {
+      return store.state.allPosts.filter(p => p.tags?.includes('news')).slice(0, 10);
+    });
+    return { store, newsPosts };
+  },
+  template: `
+    <section class="view-shell">
+      <Banner title="News" subtitle="新闻动态" variant="dark" />
+
+      <div class="page-panel">
+        <PostGrid
+          :posts="newsPosts"
+          :loading="store.state.loadingAll"
+          empty-title="暂无新闻"
+          empty-description="等待新闻动态..."
+        />
+      </div>
+    </section>
+  `
+};
+
+const ForumPage = {
+  components: { Banner, PostGrid },
+  setup() {
+    const store = useAppStore();
+    return { store };
+  },
+  template: `
+    <section class="view-shell">
+      <Banner title="FORUM" subtitle="暧昧区" variant="purple" />
+
+      <div class="page-panel">
+        <PostGrid
+          :posts="store.state.allPosts.slice(0, 10)"
+          :loading="store.state.loadingAll"
+          empty-title="暂无讨论"
+          empty-description="参与社区讨论..."
+        />
+      </div>
+    </section>
+  `
+};
+
+const SubmitPage = {
+  components: { Banner },
+  setup() {
+    const store = useAppStore();
+    return { store };
+  },
+  template: `
+    <section class="view-shell">
+      <Banner title="SUBMIT" subtitle="插足上报" variant="green" />
+
+      <div class="page-panel">
+        <button class="primary-button" @click="store.openPublishModal()">
+          <span>发布新内容</span>
+        </button>
+      </div>
+    </section>
+  `
+};
+
+const TrendingPage = {
+  components: { Banner, PostGrid, StatsStrip },
+  setup() {
+    const store = useAppStore();
+    const hotPosts = computed(() => {
+      return [...store.state.allPosts]
+        .sort((a, b) => (b.stars || 0) - (a.stars || 0))
+        .slice(0, 10);
+    });
+    return { store, hotPosts };
+  },
+  template: `
+    <section class="view-shell">
+      <Banner title="TRENDING" subtitle="修罗场 - 热门内容" variant="red" />
+
+      <div class="page-panel">
+        <PostGrid
+          :posts="hotPosts"
+          :loading="store.state.loadingAll"
+          empty-title="暂无热门"
+          empty-description="等待热门内容..."
+        />
+      </div>
+    </section>
+  `
+};
+
+const UserPage = {
+  components: { Banner },
+  setup() {
+    const store = useAppStore();
+    return { store };
+  },
+  template: `
+    <section class="view-shell">
+      <Banner title="USER" subtitle="局中人" variant="blue" />
+
+      <div class="page-panel">
+        <div v-if="store.isLoggedIn" class="user-info">
+          <span class="avatar-circle large">{{ store.state.currentUser?.username?.charAt(0) }}</span>
+          <h3>{{ store.state.currentUser?.username }}</h3>
+          <p>{{ store.state.currentUser?.institution }}</p>
+        </div>
+        <button v-else class="primary-button" @click="store.openAuthModal('login')">
+          <span>登录以查看</span>
+        </button>
+      </div>
     </section>
   `
 };
@@ -120,7 +236,7 @@ const RecyclePage = {
     <section class="view-shell">
       <HeroBanner
         badge="Recycle Bin"
-        title="回收站页先承接归档与二次整理"
+        title="回收站页先承接归档与二次���理"
         description="回收站不是空页面，而是把低热度、熬夜赶稿、值得打捞的内容拆成多个区块，方便后续继续迭代成专题墙。"
         primary-label="去搜索"
         secondary-label="继续浏览"
@@ -205,6 +321,11 @@ const SearchPage = {
 
 export const routes = [
   { path: '/', name: 'home', component: HomePage },
+  { path: '/news', name: 'news', component: NewsPage },
+  { path: '/forum', name: 'forum', component: ForumPage },
+  { path: '/submit', name: 'submit', component: SubmitPage },
+  { path: '/trending', name: 'trending', component: TrendingPage },
+  { path: '/user', name: 'user', component: UserPage },
   { path: '/discover', name: 'discover', component: DiscoverPage },
   { path: '/recycle', name: 'recycle', component: RecyclePage },
   { path: '/search', name: 'search', component: SearchPage }

@@ -10,7 +10,6 @@ import {
 } from 'vue-router';
 import {
   AppHeader,
-  AppSidebar,
   AuthModal,
   PostDetailModal,
   PublishModal
@@ -29,7 +28,6 @@ const store = createAppStore(router);
 const App = {
   components: {
     AppHeader,
-    AppSidebar,
     AuthModal,
     PublishModal,
     PostDetailModal,
@@ -52,13 +50,10 @@ const App = {
   },
   template: `
     <div class="app-shell">
-      <AppSidebar />
-      <main class="main-stage">
-        <AppHeader />
-        <div class="main-view">
-          <RouterView />
-        </div>
-      </main>
+      <AppHeader />
+      <div class="main-view">
+        <RouterView />
+      </div>
 
       <button class="floating-action" @click="store.openPublishModal()">
         <span>+</span>

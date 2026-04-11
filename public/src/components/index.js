@@ -35,10 +35,24 @@ export const AppHeader = {
   setup() {
     const store = useAppStore();
     const router = useRouter();
+    const route = useRoute();
     const searchModel = computed({
       get: () => store.state.searchQuery,
       set: (value) => store.setSearchQuery(value)
     });
+
+    const navItems = [
+      { label: 'HOME', sub: '主页', name: 'home' },
+      { label: 'NEWS', sub: '新闻', name: 'news' },
+      { label: 'FORUM', sub: '暧昧区', name: 'forum' },
+      { label: 'SUBMIT', sub: '插足', name: 'submit' },
+      { label: 'TRENDING', sub: '修罗场', name: 'trending' },
+      { label: 'USER', sub: '局中人', name: 'user' }
+    ];
+
+    function go(name) {
+      router.push({ name });
+    }
 
     function goSearch() {
       if (router.currentRoute.value.name !== 'search') {
@@ -46,49 +60,50 @@ export const AppHeader = {
       }
     }
 
-    return { store, searchModel, goSearch };
+    return { store, route, navItems, go, searchModel, goSearch };
   },
   template: `
     <header class="app-header">
-      <div class="brand-block">
-        <img src="/images/Third_Logo.png" alt="学术垃圾收容所" class="brand-logo">
-        <div class="brand-copy">
-          <span class="eyebrow">Academic Waste Depot</span>
-          <h1>学术垃圾收容所</h1>
-        </div>
-      </div>
-
-      <div class="header-search">
-        <AppIcon name="search" />
-        <input
-          v-model="searchModel"
-          type="text"
-          placeholder="搜索论文、作业、作者或标签"
-          @focus="goSearch"
-        >
-      </div>
-
-      <div class="header-actions">
-        <button class="ghost-button" @click="store.openPublishModal()">
-          <AppIcon name="plus" />
-          <span>投放垃圾</span>
+      <div class="header-row-1">
+        <button class="menu-button">
+          <AppIcon name="menu" />
         </button>
-
-        <button v-if="!store.isLoggedIn" class="primary-button" @click="store.openAuthModal('login')">
+        <div class="logo-block">
+          <img src="/images/Third_Logo.png" alt="Third" class="header-logo">
+          <span class="logo-text">Third</span>
+        </div>
+        <div class="header-search">
+          <AppIcon name="search" />
+          <input
+            v-model="searchModel"
+            type="text"
+            placeholder="搜索..."
+            @focus="goSearch"
+          >
+        </div>
+        <button v-if="!store.isLoggedIn" class="login-button" @click="store.openAuthModal('login')">
           <AppIcon name="log-in" />
           <span>登录</span>
         </button>
-
-        <button v-else class="profile-pill" @click="store.openPublishModal()">
+        <button v-else class="profile-button">
           <span class="avatar-circle">{{ getInitial(store.state.currentUser?.username) }}</span>
-          <span>{{ store.state.currentUser?.username }}</span>
         </button>
       </div>
+
+      <nav class="header-row-2">
+        <button
+          v-for="item in navItems"
+          :key="item.name"
+          class="nav-item"
+          :class="{ active: route.name === item.name }"
+          @click="go(item.name)"
+        >
+          <span class="nav-label">{{ item.label }}</span>
+          <span class="nav-sub">{{ item.sub }}</span>
+        </button>
+      </nav>
     </header>
-  `,
-  methods: {
-    getInitial
-  }
+  `
 };
 
 export const AppSidebar = {
@@ -169,6 +184,26 @@ export const AppSidebar = {
         </button>
       </div>
     </aside>
+  `
+};
+
+export const Banner = {
+  props: {
+    title: String,
+    subtitle: String,
+    variant: {
+      type: String,
+      default: 'default'
+    }
+  },
+  template: `
+    <section class="page-banner" :class="variant">
+      <div class="banner-content">
+        <h1 v-if="title">{{ title }}</h1>
+        <p v-if="subtitle">{{ subtitle }}</p>
+        <slot></slot>
+      </div>
+    </section>
   `
 };
 
