@@ -1,18 +1,18 @@
+const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
 const { put } = require('@vercel/blob');
-const supabase = require('./auth/supabase');
 
-// POST /api/upload - 上传论文文件（需认证）
-// 返回文件 URL 和下载签名链接
-module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+const router = express.Router();
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
+  process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3B5bmVhZmdocXlraWNpeXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjczNzEsImV4cCI6MjA5MTUwMzM3MX0.zTPkPVOzK-MtgaMAkdKS6gnKiI9OLJEMe0j1oUqRssw'
+);
 
+const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
+
+// POST /api/upload - 上传论文文件
+router.post('/', async (req, res) => {
   try {
     // 验证认证
     const auth = req.headers.authorization;
@@ -20,7 +20,6 @@ module.exports = async (req, res) => {
       return res.status(401).json({ error: '请先登录' });
     }
     const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
     const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
     const userId = decoded.userId;
 
@@ -61,10 +60,11 @@ module.exports = async (req, res) => {
           title,
           description: description || '',
           tags: tags || [],
-          file_url: blob.downloadUrl, // 使用下载链接
+          file_url: blob.downloadUrl,
           institution: institution || userData?.institution || '匿名学术难民',
           stars: 0,
-          views: 0
+          views: 0,
+          starred_by: []
         }
       ])
       .select()
@@ -72,7 +72,6 @@ module.exports = async (req, res) => {
 
     if (paperError) {
       console.error('创建论文记录失败:', paperError);
-      // 文件已上传，但数据库记录失败，返回文件信息让前端可以重试
       return res.status(200).json({
         fileUrl: blob.downloadUrl,
         fileName: safeFileName,
@@ -80,11 +79,11 @@ module.exports = async (req, res) => {
       });
     }
 
-    return res.status(200).json({
-      paper
-    });
+    return res.status(200).json({ paper });
   } catch (e) {
     console.error('上传错误:', e);
     return res.status(500).json({ error: '上传失败' });
   }
-};
+});
+
+module.exports = router;
