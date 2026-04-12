@@ -1,6 +1,6 @@
-const supabase = require('../../auth/supabase');
+const supabase = require('../auth/supabase');
 
-// GET /api/user/favorites - 获取当前用户的收藏论文列表
+// GET /api/user/profile - 获取当前用户信息
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -21,35 +21,30 @@ module.exports = async (req, res) => {
     const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
     const userId = decoded.userId;
 
-    // 从 users 表获取收藏的论文 ID 列表
-    const { data: userData, error: userError } = await supabase
+    const { data: user, error } = await supabase
       .from('users')
-      .select('favorites')
+      .select('id, username, institution, favorites, created_at')
       .eq('id', userId)
       .single();
 
-    if (userError || !userData) {
-      return res.status(200).json({ papers: [], favoriteIds: [] });
+    if (error || !user) {
+      return res.status(404).json({ error: '用户不存在' });
     }
 
-    const favoriteIds = userData.favorites || [];
-
-    if (favoriteIds.length === 0) {
-      return res.status(200).json({ papers: [], favoriteIds: [] });
-    }
-
-    // 获取收藏的论文详情
-    const { data: papers, error: papersError } = await supabase
+    // 获取用户上传的论文数量
+    const { count } = await supabase
       .from('papers')
-      .select('*')
-      .in('id', favoriteIds);
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
 
     return res.status(200).json({
-      papers: papers || [],
-      favoriteIds
+      user: {
+        ...user,
+        paperCount: count || 0
+      }
     });
   } catch (e) {
-    console.error('获取收藏失败:', e);
+    console.error('获取用户信息错误:', e);
     return res.status(500).json({ error: '服务器内部错误' });
   }
 };
