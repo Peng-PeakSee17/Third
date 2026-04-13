@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
+import path from 'path';
 
 export default defineConfig({
+  root: 'public',
+  publicDir: false,
   server: {
     port: 5173,
     proxy: {
