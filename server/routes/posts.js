@@ -5,9 +5,9 @@ const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
 // Get all posts (with optional tab filter and search)
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { tab, search } = req.query;
-  let posts = getPosts();
+  let posts = await getPosts();
 
   if (tab === 'hot') {
     posts = [...posts].sort((a, b) => (b.comments + b.stars * 2) - (a.comments + a.stars * 2));
