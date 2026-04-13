@@ -9,7 +9,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/supabase-js": "^2.103.0",
     "@upstash/redis": "^1.28.0",
     "@vercel/blob": "^0.22.0",
     "@vue/devtools-api": "^8.1.1",

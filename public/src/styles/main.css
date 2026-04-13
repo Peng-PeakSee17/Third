@@ -426,11 +426,11 @@ img {
   gap: 8px;
   padding: 10px 28px;
   border-radius: var(--radius-sm);
-  background: white;
-  color: #000000;
+  background-color: white;
+  color: black;
   font-weight: 600;
   font-size: 12px;
-  border: 1px solid #000000;
+  border: 1px solid black;
   cursor: pointer;
   transition: 0.2s;
   white-space: nowrap;
@@ -438,11 +438,12 @@ img {
 }
 
 .login-button:hover {
-  background: #f5f5f5;
+  background-color: #f5f5f5;
 }
 
 .login-button span {
-  color: #000000;
+  color: black;
+  display: inline-block;
 }
 
 .login-button i {
@@ -1504,5 +1505,231 @@ img {
 
   .floating-action {
     bottom: 94px;
+  }
+
+  .app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-row-1 {
+    padding: 12px 16px;
+  }
+
+  .header-row-1 .header-left {
+    flex: 0;
+    min-width: auto;
+  }
+
+  .header-row-1 .header-center {
+    flex: 1;
+    order: -1;
+  }
+
+  .header-row-1 .header-right {
+    flex: 0;
+    min-width: auto;
+  }
+
+  .menu-button {
+    padding: 8px 10px;
+  }
+
+  .menu-text {
+    display: none;
+  }
+
+  .logo-block {
+    padding: 0;
+  }
+
+  .logo-main {
+    font-size: 32px;
+    letter-spacing: -1px;
+  }
+
+  .logo-sub {
+    display: none;
+  }
+
+  .logo-dot {
+    width: 5px;
+    height: 5px;
+    margin: 0 3px;
+  }
+
+  .search-popup {
+    top: 60px;
+    width: calc(100% - 32px);
+    left: 16px;
+    right: 16px;
+    transform: none;
+    padding: 12px;
+  }
+
+  .search-popup-input {
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .menu-sidebar {
+    width: 85vw;
+    max-width: 320px;
+  }
+
+  .main-stage {
+    padding: 70px 16px 110px;
+  }
+
+  .hero-banner {
+    padding: 20px;
+  }
+
+  .hero-banner h2 {
+    font-size: 24px;
+  }
+
+  .section-head h3 {
+    font-size: 18px;
+  }
+
+  .feed-tabs {
+    gap: 8px;
+    padding: 8px;
+    border-radius: 16px;
+  }
+
+  .feed-tab {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .stats-strip {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .stats-card {
+    padding: 16px;
+  }
+
+  .post-card {
+    padding: 16px;
+  }
+
+  .post-card-title {
+    font-size: 16px;
+  }
+
+  .post-card-excerpt {
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .post-author-row {
+    flex-wrap: wrap;
+  }
+
+  .post-meta {
+    font-size: 12px;
+  }
+
+  .banner {
+    min-height: 120px;
+  }
+
+  .banner-title {
+    font-size: 28px;
+  }
+
+  .detail-panel {
+    padding: 20px;
+  }
+
+  .detail-title {
+    font-size: 22px;
+  }
+
+  .detail-content {
+    font-size: 15px;
+    line-height: 1.8;
+  }
+
+  .modal-panel {
+    width: calc(100% - 32px);
+    max-width: none;
+    padding: 20px;
+  }
+
+  .form-field input,
+  .form-field textarea {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .form-tags {
+    flex-wrap: wrap;
+  }
+
+  .tag-cloud-item {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .login-button {
+    padding: 8px 12px;
+    min-width: auto;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 400px) {
+  .logo-main {
+    font-size: 24px;
+    letter-spacing: -0.5px;
+  }
+
+  .header-row-1 {
+    padding: 10px 12px;
+  }
+
+  .icon-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .search-popup {
+    top: 56px;
+    width: calc(100% - 24px);
+    left: 12px;
+    right: 12px;
+  }
+
+  .main-stage {
+    padding: 66px 12px 100px;
+  }
+
+  .mobile-nav {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .mobile-nav-link {
+    padding: 10px 6px;
+    font-size: 11px;
+  }
+
+  .floating-action {
+    bottom: 88px;
+    right: 16px;
   }
 }
