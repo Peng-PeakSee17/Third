@@ -1,13 +1,11 @@
 {
   "version": 2,
-  "cleanUrls": true,
   "builds": [
-    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "public/dist/**", "use": "@vercel/static" },
     { "src": "server/index.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "server/index.js" },
-    { "src": "/src/(.*)", "dest": "public/src/$1" },
-    { "src": "/(.*)", "dest": "public/$1" }
+    { "src": "/(.*)", "dest": "public/dist/index.html" }
   ]
 }
