@@ -523,31 +523,95 @@ export const AuthModal = {
     const store = useAppStore();
     const form = reactive({
       username: '',
+      email: '',
       password: '',
+      confirmPassword: '',
       institution: ''
     });
     const error = reactive({ message: '' });
+    const registerStep = ref('form');
+    const verificationCode = ref('');
 
     watch(
       () => store.state.showAuthModal,
       (open) => {
         if (open) {
           error.message = '';
+          registerStep.value = 'form';
+          verificationCode.value = '';
         }
       }
     );
 
     async function submit() {
       error.message = '';
+
+      if (!form.username.trim()) {
+        error.message = '用户名不能为空';
+        return;
+      }
+      if (!form.password) {
+        error.message = '密码不能为空';
+        return;
+      }
+
+      if (store.state.authMode === 'register') {
+        if (!form.email.trim()) {
+          error.message = '邮箱不能为空';
+          return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+          error.message = '邮箱格式不正确';
+          return;
+        }
+        if (form.password !== form.confirmPassword) {
+          error.message = '两次密码不一致';
+          return;
+        }
+      }
+
       try {
-        await store.submitAuth({
-          username: form.username.trim(),
-          password: form.password,
-          institution: form.institution.trim()
+        if (store.state.authMode === 'register') {
+          await store.sendVerificationCode({
+            username: form.username.trim(),
+            email: form.email.trim(),
+            password: form.password,
+            institution: form.institution.trim()
+          });
+          registerStep.value = 'code';
+        } else {
+          await store.submitAuth({
+            username: form.username.trim(),
+            password: form.password
+          });
+          form.username = '';
+          form.email = '';
+          form.password = '';
+          form.confirmPassword = '';
+          form.institution = '';
+        }
+      } catch (err) {
+        error.message = err.message;
+      }
+    }
+
+    async function verifyCode() {
+      error.message = '';
+      if (!verificationCode.value.trim()) {
+        error.message = '请输入验证码';
+        return;
+      }
+      try {
+        await store.verifyAndRegister({
+          email: form.email.trim(),
+          code: verificationCode.value.trim()
         });
         form.username = '';
+        form.email = '';
         form.password = '';
+        form.confirmPassword = '';
         form.institution = '';
+        verificationCode.value = '';
       } catch (err) {
         error.message = err.message;
       }
@@ -559,10 +623,10 @@ export const AuthModal = {
       }
     }
 
-    return { store, form, error, submit, closeOnMask };
+    return { store, form, error, registerStep, verificationCode, submit, verifyCode, closeOnMask };
   },
   template: `
-    <div v-if="store.state.showAuthModal" class="modal-mask" @click="closeOnMask">
+    <div v-if="store.state.showAuthModal" class="modal-mask auth-modal-mask" @click="closeOnMask">
       <div class="modal-panel auth-panel">
         <button class="icon-button floating-close" @click="store.closeAuthModal()">
           <AppIcon name="x" />
@@ -571,33 +635,68 @@ export const AuthModal = {
         <h3>{{ store.state.authMode === 'register' ? '注册账号' : '登录继续浏览' }}</h3>
         <p>保留收藏、发布内容和查看完整详情都依赖账号状态。</p>
 
-        <label class="form-field">
-          <span>用户名</span>
-          <input v-model="form.username" type="text" placeholder="输入你的学术昵称">
-        </label>
+        <template v-if="store.state.authMode === 'register' && registerStep === 'code'">
+          <p>验证码已发送到 <strong>{{ form.email }}</strong></p>
+          <label class="form-field">
+            <span>验证码</span>
+            <input v-model="verificationCode" type="text" placeholder="输入6位验证码" maxlength="6">
+          </label>
 
-        <label class="form-field">
-          <span>密码</span>
-          <input v-model="form.password" type="password" placeholder="设置一个不会忘的密码">
-        </label>
+          <span v-if="error.message" class="form-error">{{ error.message }}</span>
 
-        <label v-if="store.state.authMode === 'register'" class="form-field">
-          <span>所属机构</span>
-          <input v-model="form.institution" type="text" placeholder="例如：某不知名学院">
-        </label>
+          <div class="modal-actions">
+            <button class="ghost-button" @click="registerStep = 'form'">
+              <AppIcon name="arrow-left" />
+              <span>返回修改</span>
+            </button>
+            <button class="primary-button" :disabled="store.state.authSubmitting" @click="verifyCode">
+              <AppIcon name="shield-check" />
+              <span>{{ store.state.authSubmitting ? '验证中...' : '完成注册' }}</span>
+            </button>
+          </div>
+        </template>
 
-        <span v-if="error.message" class="form-error">{{ error.message }}</span>
+        <template v-else>
+          <label class="form-field">
+            <span>用户名</span>
+            <input v-model="form.username" type="text" placeholder="输入你的学术昵称">
+          </label>
 
-        <div class="modal-actions">
-          <button class="ghost-button" @click="store.state.authMode = store.state.authMode === 'login' ? 'register' : 'login'">
-            <AppIcon name="refresh-cw" />
-            <span>{{ store.state.authMode === 'login' ? '切换注册' : '切换登录' }}</span>
-          </button>
-          <button class="primary-button" :disabled="store.state.authSubmitting" @click="submit">
-            <AppIcon name="shield-check" />
-            <span>{{ store.state.authSubmitting ? '提交中...' : '确认' }}</span>
-          </button>
-        </div>
+          <template v-if="store.state.authMode === 'register'">
+            <label class="form-field">
+              <span>邮箱</span>
+              <input v-model="form.email" type="email" placeholder="输入你的邮箱地址">
+            </label>
+          </template>
+
+          <label class="form-field">
+            <span>密码</span>
+            <input v-model="form.password" type="password" placeholder="设置一个不会忘的密码">
+          </label>
+
+          <label v-if="store.state.authMode === 'register'" class="form-field">
+            <span>确认密码</span>
+            <input v-model="form.confirmPassword" type="password" placeholder="再次输入密码">
+          </label>
+
+          <label v-if="store.state.authMode === 'register'" class="form-field">
+            <span>所属大学</span>
+            <input v-model="form.institution" type="text" placeholder="例如：门头沟学院">
+          </label>
+
+          <span v-if="error.message" class="form-error">{{ error.message }}</span>
+
+          <div class="modal-actions">
+            <button class="ghost-button" @click="store.state.authMode = store.state.authMode === 'login' ? 'register' : 'login'">
+              <AppIcon name="refresh-cw" />
+              <span>{{ store.state.authMode === 'login' ? '切换注册' : '切换登录' }}</span>
+            </button>
+            <button class="primary-button" :disabled="store.state.authSubmitting" @click="submit">
+              <AppIcon name="shield-check" />
+              <span>{{ store.state.authSubmitting ? '提交中...' : (store.state.authMode === 'register' ? '发送验证码' : '确认') }}</span>
+            </button>
+          </div>
+        </template>
       </div>
     </div>
   `
@@ -616,6 +715,14 @@ export const PublishModal = {
 
     async function submit() {
       error.message = '';
+      if (!form.title.trim()) {
+        error.message = '标题不能为空';
+        return;
+      }
+      if (!form.content.trim()) {
+        error.message = '内容不能为空';
+        return;
+      }
       try {
         await store.publishPost({
           title: form.title.trim(),
@@ -691,6 +798,7 @@ export const PostDetailModal = {
         (store.state.selectedPost.favorites || []).includes(store.state.currentUser.id)
       )
     );
+    const linkCopied = ref(false);
 
     function closeOnMask(event) {
       if (event.target === event.currentTarget) {
@@ -701,9 +809,11 @@ export const PostDetailModal = {
     async function copyLink() {
       if (!store.state.selectedPost) return;
       await navigator.clipboard.writeText(`${window.location.origin}/?post=${store.state.selectedPost.id}`);
+      linkCopied.value = true;
+      setTimeout(() => { linkCopied.value = false; }, 2000);
     }
 
-    return { store, isFavorite, closeOnMask, copyLink, getInitial, formatLongDate, formatNumber };
+    return { store, isFavorite, linkCopied, closeOnMask, copyLink, getInitial, formatLongDate, formatNumber };
   },
   template: `
     <div v-if="store.state.showPostModal" class="modal-mask" @click="closeOnMask">
@@ -746,7 +856,7 @@ export const PostDetailModal = {
             </button>
             <button class="primary-button" @click="copyLink">
               <AppIcon name="share-2" />
-              <span>复制链接</span>
+              <span>{{ linkCopied ? '已复制' : '复制链接' }}</span>
             </button>
           </div>
         </template>

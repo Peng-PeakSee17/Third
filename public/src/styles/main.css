@@ -1163,6 +1163,10 @@ img {
   backdrop-filter: blur(10px);
 }
 
+.auth-modal-mask {
+  z-index: 400;
+}
+
 .modal-panel {
   position: relative;
   width: min(560px, 100%);

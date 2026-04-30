@@ -44,6 +44,12 @@ const App = {
     onMounted(async () => {
       await store.bootstrap();
       refreshIcons();
+
+      const params = new URLSearchParams(window.location.search);
+      const postId = params.get('post');
+      if (postId) {
+        store.openPost(postId);
+      }
     });
 
     return { store };

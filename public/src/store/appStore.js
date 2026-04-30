@@ -205,6 +205,39 @@ export function createAppStore(router) {
     }
   }
 
+  async function sendVerificationCode(payload) {
+    state.authSubmitting = true;
+    try {
+      await request(`${API}/auth/send-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } finally {
+      state.authSubmitting = false;
+    }
+  }
+
+  async function verifyAndRegister(payload) {
+    state.authSubmitting = true;
+    try {
+      const data = await request(`${API}/auth/verify-register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      state.token = data.token;
+      state.currentUser = data.user;
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      closeAuthModal();
+      await refreshAll();
+    } finally {
+      state.authSubmitting = false;
+    }
+  }
+
   function logout() {
     state.token = '';
     state.currentUser = null;
@@ -218,6 +251,7 @@ export function createAppStore(router) {
       openAuthModal('login');
       return;
     }
+    closePostModal();
     state.showPublishModal = true;
   }
 
@@ -255,6 +289,9 @@ export function createAppStore(router) {
   async function openPost(postId) {
     state.detailLoading = true;
     state.showPostModal = true;
+    const url = new URL(window.location);
+    url.searchParams.set('post', postId);
+    window.history.replaceState({}, '', url);
     try {
       const options = state.token
         ? {
@@ -273,6 +310,9 @@ export function createAppStore(router) {
   function closePostModal() {
     state.showPostModal = false;
     state.selectedPost = null;
+    const url = new URL(window.location);
+    url.searchParams.delete('post');
+    window.history.replaceState({}, '', url);
   }
 
   async function toggleFavorite(postId) {
@@ -311,6 +351,8 @@ export function createAppStore(router) {
     openAuthModal,
     closeAuthModal,
     submitAuth,
+    sendVerificationCode,
+    verifyAndRegister,
     logout,
     openPublishModal,
     closePublishModal,
