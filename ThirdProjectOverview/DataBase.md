@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-本项目采用 **Supabase（数据库）+ Vercel Blob（文件存储）** 组合方案，实现用户系统、论文管理系统的数据持久化与文件存储，满足注册 / 登录、论文上传、公开访问、权限隔离等核心业务需求。
+本项目采用 **Supabase（数据库）+ 服务器本地磁盘（文件存储）** 组合方案，实现用户系统、论文管理系统的数据持久化与文件存储，满足注册 / 登录、论文上传、公开访问、权限隔离等核心业务需求。
 
 ------
 
@@ -11,7 +11,7 @@
 |   存储类型   |          服务           |                   核心用途                    |
 | :----------: | :---------------------: | :-------------------------------------------: |
 | 关系型数据库 | **Supabase PostgreSQL** |      存储用户信息、论文元数据、业务数据       |
-| 对象文件存储 |     **Vercel Blob**     | 存储用户上传的论文文件（PDF / Word / TXT 等） |
+|   文件存储   |   **服务器本地磁盘**    | 存储用户上传的论文文件（PDF / Word / TXT 等） |
 |   认证系统   |    **Supabase Auth**    |      内置用户注册、登录、Token、会话管理      |
 
 ------
@@ -55,7 +55,7 @@ FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
 |   user_id   |    uuid     |       NULL        |         上传者用户 ID         |
 |    title    |    text     |       NULL        |           论文标题            |
 | description |    text     |       NULL        |        论文摘要 / 简介        |
-|  file_url   |    text     |       NULL        | 论文在 Vercel Blob 的访问链接 |
+|  file_url   |    text     |       NULL        | 论文文件路径，格式 /api/files/xxx |
 |    tags     |   text[]    |        {}         |         论文标签数组          |
 |    stars    |   integer   |         0         |            点赞数             |
 |    views    |   integer   |         0         |            阅读数             |
@@ -101,30 +101,25 @@ CREATE POLICY "Authors can delete own" ON papers FOR DELETE USING (auth.uid() = 
 
 ------
 
-# 四、Vercel Blob 文件存储
+# 四、本地文件存储
 
 ## 用途
 
 专门存储 **用户上传的论文文件**（PDF、DOCX、TXT 等）。
 
-## 为什么使用 Vercel Blob
+## 存储方案
 
-- 轻量、免费额度充足
-- 与前端项目无缝集成
-- 提供稳定文件 URL
-- 无需管理存储桶、无需复杂配置
+- 文件保存在服务器 `server/uploads/` 目录
+- 上传时生成唯一文件名（时间戳 + 原始文件名），写入本地磁盘
+- `papers.file_url` 存储格式为 `/api/files/xxx`
+- 下载需通过 GET `/api/files/:filename` 并携带 JWT Token 认证
+- 删除论文时自动清理关联文件
 
 ## 存储内容
 
 - 论文原文件
-- 返回公开可访问 URL
-- URL 存入 `papers.file_url`
-
-## 环境变量
-
-```plaintext
-BLOB_READ_WRITE_TOKEN
-```
+- 通过 `/api/files/:filename` 端点下载（需认证）
+- 文件路径存入 `papers.file_url`
 
 ------
 
@@ -135,16 +130,16 @@ BLOB_READ_WRITE_TOKEN
 | **Supabase Auth** |   注册、登录、会话、Token    |   不存储用户资料   |
 |   **users 表**    |      存储用户资料、收藏      | 不存密码、不存文件 |
 |   **papers 表**   | 论文元数据、标题、标签、热度 |    不存论文文件    |
-|  **Vercel Blob**  |    论文文件存储、下载链接    |    不存业务数据    |
+| **本地文件存储** |    论文文件存储、下载链接    |    不存业务数据    |
 
 ------
 
 # 六、项目数据流
 
 1. 用户注册 → Supabase Auth 创建账号 → 写入 `users` 表
-2. 用户上传论文 → 文件存入 **Vercel Blob** → 获取 URL
-3. 论文信息 + URL → 写入 `papers` 表
-4. 前端展示论文 → 读取 `papers` 数据 → 通过 URL 加载文件
+2. 用户上传论文 → 文件存入 **服务器本地磁盘** (`server/uploads/`) → 获取路径 `/api/files/xxx`
+3. 论文信息 + 文件路径 → 写入 `papers` 表
+4. 前端展示论文 → 读取 `papers` 数据 → 通过 `/api/files/:filename` 加载文件（需 JWT 认证）
 5. 权限控制 → RLS 自动校验用户身份
 
 ------

@@ -6,9 +6,9 @@
 
 **适用**：论文平台、用户系统、论文上传、展示、管理
 
-**托管**：Vercel + Supabase PostgreSQL + Vercel Blob
+**托管**：前端 Vercel + 后端自建服务器 + Supabase PostgreSQL + 本地文件存储
 
-**架构**：Vue3 + Vite + Express + Serverless 部署
+**架构**：Vue3 + Vite + Express + PM2 + Nginx 部署
 
 ------
 
@@ -19,50 +19,47 @@
 |   前端   |      Vue 3 + Vite      |      SPA 单页应用      |
 |   后端   |  Express（单一入口）   |     统一 API 服务      |
 |  数据库  |  Supabase PostgreSQL   |  用户信息、论文元数据  |
-| 文件存储 | Vercel Blob（Private） | 论文 PDF / Word / 文档 |
+| 文件存储 | 服务器本地磁盘（`server/uploads/`） | 论文 PDF / Word / 文档 |
 |   认证   |  Supabase Auth + JWT   |  用户登录、注册、鉴权  |
 
 ------
 
 # 2. 部署规则 ⚠️ 核心不可变规则
 
-## 2.1 vercel.json 配置（禁止修改）
+## 2.1 前端部署（Vercel 静态托管）
+
+Vercel 仅负责前端静态文件托管，不再运行后端 API。
 
 ```json
 {
-  "version": 2,
-  "cleanUrls": true,
   "builds": [
-    { "src": "public/**", "use": "@vercel/static" },
-    { "src": "server/index.js", "use": "@vercel/node" }
+    { "src": "public/dist/**", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "server/index.js" },
-    { "src": "/src/(.*)", "dest": "/public/src/$1" },
-    { "src": "/(.*)", "dest": "/public/$1" }
+    { "src": "/(.*)", "dest": "public/dist/index.html" }
   ]
 }
 ```
 
-## 2.2 路由规则
+## 2.2 后端部署（自建服务器 + PM2 + Nginx）
+
+- Express 后端通过 PM2 常驻运行在服务器上
+- Nginx 反向代理 `/api/` 请求到 Express（`127.0.0.1:3000`）
+- `client_max_body_size 60m` 支持大文件上传
+- 3000 端口不对外开放，由 Nginx 代理
+
+## 2.3 路由规则
 
 |   路径   |           处理方            |         说明         |
 | :------: | :-------------------------: | :------------------: |
-| `/api/*` | Express (`server/index.js`) | **所有接口统一入口** |
-| `/src/*` |        `public/src/`        |    前端 Vue 资源     |
-|   `/*`   |          `public/`          |       前端页面       |
+| `/api/*` | Nginx → Express (服务器) | **所有接口统一入口** |
+|   `/*`   |     Vercel 静态托管      |       前端页面       |
 
-## 2.3 绝对禁止行为 ❌
+## 2.4 绝对禁止行为 ❌
 
-以下行为会直接导致 **API 冲突 / 500 / 404 / 部署失败**：
-
-- ❌ 禁止创建 `/api/xxx.js`
-- ❌ 禁止创建 `/api/papers/xxx.js`
-- ❌ 禁止创建 `/api/auth/xxx.js`
-- ❌ 禁止在项目根目录出现 `/api/` 文件夹
+- ❌ 禁止在项目根目录创建 `/api/` 文件夹或任何 `/api/*.js` 文件
 - ❌ 禁止修改 `vercel.json` 路由规则
-
-> 所有 API **必须写在 Express** 中，不使用 Vercel Serverless Functions
+- ❌ 所有 API **必须写在 Express** 中（`server/routes/`）
 
 ------
 
@@ -80,13 +77,14 @@ Third/
 │   │   ├── styles/          # 样式
 │   │   └── utils/           # 工具函数
 │   └── images/              # 图片资源
-├── server/                  # Express 后端（唯一 API 入口）
+├── server/                  # Express 后端（部署到自建服务器）
 │   ├── index.js             # ⚠️ 主入口，注册所有路由
 │   ├── routes/              # 路由模块（推荐拆分）
 │   │   ├── auth.js          # 登录 / 注册
 │   │   ├── papers.js        # 论文 CRUD
 │   │   ├── user.js          # 用户信息 / 收藏
 │   │   └── posts.js         // 旧帖子模块
+│   ├── uploads/             # 上传文件存储目录（gitignore）
 │   ├── middleware/          # 中间件（auth 等）
 │   └── data/                # 数据工具类
 ├── vercel.json              # ⚠️ 禁止修改
@@ -192,28 +190,37 @@ res.status(400/401/403/404/500).json({ error: '错误说明' })
 
 ------
 
-# 6. 文件存储规范（Vercel Blob）
+# 6. 文件存储规范（本地磁盘）
 
 ## 6.1 规则
 
-- 模式：private（私密）
+- 存储位置：`server/uploads/` 目录
 - 用途：论文 PDF / DOCX / TXT
 - 单文件限制：≤50MB
-- 前端通过 `downloadUrl` 访问
+- 下载需 JWT 认证（GET `/api/files/:filename`）
+- 删除论文时自动清理关联文件
 
 ## 6.2 上传流程
 
-前端上传 → `/api/upload` → 存入 Vercel Blob → 返回 URL → 写入 `papers` 表
+前端上传 → `/api/upload` → 写入 `server/uploads/` → 返回 `/api/files/xxx` → 写入 `papers` 表
 
 ------
 
 # 7. 环境变量（必须配置）
 
+## 服务器端 .env
+
 ```plaintext
 SUPABASE_URL
 SUPABASE_ANON_KEY
-BLOB_READ_WRITE_TOKEN
 JWT_SECRET
+PORT
+```
+
+## 前端构建（Vercel 环境变量）
+
+```plaintext
+VITE_API_URL=http://服务器IP/api
 ```
 
 ------
@@ -235,13 +242,16 @@ git push origin master
 
 # 9. 避坑指南
 
-|   问题   |         原因         |         解决方案          |
-| :------: | :------------------: | :-----------------------: |
-|   404    |       路由错误       |    不修改 vercel.json     |
-|   500    | /api 目录存在独立 JS |     删除 /api 文件夹      |
-|  空白页  | 前端文件不在 public  | 确保 index.html 在 public |
-| 部署失败 |     缺少环境变量     |      在 Vercel 配置       |
-| 接口 401 |      Token 无效      |         重新登录          |
+|     问题     |           原因           |           解决方案           |
+| :----------: | :----------------------: | :--------------------------: |
+|     404      |         路由错误         |      不修改 vercel.json      |
+|     500      |  /api 目录存在独立 JS   |       删除 /api 文件夹       |
+|    空白页    |   前端文件不在 public    |  确保 index.html 在 public   |
+|   部署失败   |       缺少环境变量       |    检查服务器 .env 配置      |
+|   接口 401   |        Token 无效        |           重新登录           |
+| 文件下载失败 | 未携带 Authorization    |   请求头带 Bearer Token     |
+| 上传 413    | Nginx 默认限制 1MB     | 设置 client_max_body_size    |
+| API 不通    | Nginx 未代理 /api/     | 检查 Nginx 反向代理配置      |
 
 ------
 

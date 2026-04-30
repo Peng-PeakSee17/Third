@@ -1,6 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
-const { put } = require('@vercel/blob');
+const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
 
@@ -193,7 +194,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     // 检查权限
     const { data: existing } = await supabase
       .from('papers')
-      .select('user_id')
+      .select('user_id, file_url')
       .eq('id', id)
       .single();
 
@@ -203,6 +204,19 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
     if (existing.user_id !== req.user.id) {
       return res.status(403).json({ error: '无权操作此论文' });
+    }
+
+    // 删除关联文件
+    if (existing.file_url) {
+      const fileName = existing.file_url.replace('/api/files/', '');
+      const filePath = path.join(__dirname, '..', 'uploads', fileName);
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fileErr) {
+        console.error('删除文件失败:', fileErr);
+      }
     }
 
     const { error } = await supabase

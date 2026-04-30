@@ -2,8 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
-const { put } = require('@vercel/blob');
+
+// 确保上传目录存在
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 const authRoutes = require('./routes/auth');
 const postsRoutes = require('./routes/posts');
@@ -46,12 +52,11 @@ app.post('/api/upload', async (req, res) => {
 
     const buffer = Buffer.from(fileData, 'base64');
     const safeFileName = `${Date.now()}-${(fileName || 'paper').replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = path.join(UPLOAD_DIR, safeFileName);
 
-    const blob = await put(safeFileName, buffer, {
-      access: 'private',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-      contentType: contentType || 'application/octet-stream'
-    });
+    fs.writeFileSync(filePath, buffer);
+
+    const fileUrl = `/api/files/${safeFileName}`;
 
     const { data: userData } = await supabase
       .from('users')
@@ -67,7 +72,7 @@ app.post('/api/upload', async (req, res) => {
           title,
           description: description || '',
           tags: tags || [],
-          file_url: blob.downloadUrl,
+          file_url: fileUrl,
           institution: institution || userData?.institution || '匿名学术难民',
           stars: 0,
           views: 0,
@@ -79,7 +84,7 @@ app.post('/api/upload', async (req, res) => {
 
     if (paperError) {
       return res.status(200).json({
-        fileUrl: blob.downloadUrl,
+        fileUrl,
         warning: '文件已上传，但创建论文记录失败'
       });
     }
@@ -91,16 +96,31 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
+// 文件下载（需 JWT 认证）
+app.get('/api/files/:filename', (req, res) => {
+  try {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer ')) {
+      return res.status(401).json({ error: '请先登录' });
+    }
+    const jwt = require('jsonwebtoken');
+    jwt.verify(auth.split(' ')[1], JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Token 无效' });
+  }
+
+  const filePath = path.join(UPLOAD_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: '文件不存在' });
+  }
+  res.sendFile(filePath);
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/papers', papersRoutes);
-
-// Serve SPA for all other routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
-});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

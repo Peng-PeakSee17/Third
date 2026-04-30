@@ -3,7 +3,7 @@ import { getPostScore, getTagSummary, includesKeyword } from '../utils/ui.js';
 
 export const APP_STORE_KEY = 'app-store';
 
-const API = '/api';
+const API = import.meta.env.VITE_API_URL || '/api';
 
 function parseStoredUser(value) {
   if (!value) return null;
