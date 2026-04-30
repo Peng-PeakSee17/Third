@@ -3,6 +3,7 @@
     { "src": "public/dist/**", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/assets/(.*)", "dest": "public/dist/assets/$1" },
     { "src": "/(.*)", "dest": "public/dist/index.html" }
   ]
 }
