@@ -2,7 +2,8 @@ import {
   computed,
   ref,
   reactive,
-  watch
+  watch,
+  onUnmounted
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '../store/appStore.js';
@@ -531,6 +532,24 @@ export const AuthModal = {
     const error = reactive({ message: '' });
     const registerStep = ref('form');
     const verificationCode = ref('');
+    const resendCountdown = ref(0);
+    let countdownTimer = null;
+
+    function startCountdown() {
+      resendCountdown.value = 60;
+      clearInterval(countdownTimer);
+      countdownTimer = setInterval(() => {
+        resendCountdown.value--;
+        if (resendCountdown.value <= 0) {
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+        }
+      }, 1000);
+    }
+
+    onUnmounted(() => {
+      clearInterval(countdownTimer);
+    });
 
     watch(
       () => store.state.showAuthModal,
@@ -539,6 +558,8 @@ export const AuthModal = {
           error.message = '';
           registerStep.value = 'form';
           verificationCode.value = '';
+          resendCountdown.value = 0;
+          clearInterval(countdownTimer);
         }
       }
     );
@@ -579,6 +600,7 @@ export const AuthModal = {
             institution: form.institution.trim()
           });
           registerStep.value = 'code';
+          startCountdown();
         } else {
           await store.submitAuth({
             username: form.username.trim(),
@@ -617,13 +639,29 @@ export const AuthModal = {
       }
     }
 
-    function closeOnMask(event) {
-      if (event.target === event.currentTarget) {
-        store.closeAuthModal();
+    async function resendCode() {
+      if (resendCountdown.value > 0) return;
+      error.message = '';
+      try {
+        await store.sendVerificationCode({
+          username: form.username.trim(),
+          email: form.email.trim(),
+          password: form.password,
+          institution: form.institution.trim()
+        });
+        startCountdown();
+      } catch (err) {
+        error.message = err.message;
       }
     }
 
-    return { store, form, error, registerStep, verificationCode, submit, verifyCode, closeOnMask };
+    function closeOnMask(event) {
+      if (event.target !== event.currentTarget) return;
+      if (store.state.authMode === 'register' && registerStep.value === 'code') return;
+      store.closeAuthModal();
+    }
+
+    return { store, form, error, registerStep, verificationCode, resendCountdown, submit, verifyCode, resendCode, closeOnMask };
   },
   template: `
     <div v-if="store.state.showAuthModal" class="modal-mask auth-modal-mask" @click="closeOnMask">
@@ -645,9 +683,9 @@ export const AuthModal = {
           <span v-if="error.message" class="form-error">{{ error.message }}</span>
 
           <div class="modal-actions">
-            <button class="ghost-button" @click="registerStep = 'form'">
-              <AppIcon name="arrow-left" />
-              <span>返回修改</span>
+            <button class="ghost-button" :disabled="resendCountdown > 0" @click="resendCode">
+              <AppIcon name="refresh-cw" />
+              <span>{{ resendCountdown > 0 ? `重新发送 (${resendCountdown}s)` : '重新发送' }}</span>
             </button>
             <button class="primary-button" :disabled="store.state.authSubmitting" @click="verifyCode">
               <AppIcon name="shield-check" />
