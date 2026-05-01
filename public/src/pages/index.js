@@ -1,5 +1,6 @@
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import {
+  AppIcon,
   Banner,
   FeedTabs,
   HeroBanner,
@@ -8,7 +9,7 @@ import {
   StatsStrip
 } from '../components/index.js';
 import { useAppStore } from '../store/appStore.js';
-import { getInitial } from '../utils/ui.js';
+import { formatDate, getInitial } from '../utils/ui.js';
 
 const HomePage = {
   components: { Banner, PostGrid },
@@ -159,9 +160,32 @@ const TrendingPage = {
 };
 
 const UserPage = {
+  components: { AppIcon, PostGrid },
   setup() {
     const store = useAppStore();
-    return { store, getInitial };
+
+    watch(
+      () => store.isLoggedIn,
+      (val) => {
+        if (val) store.fetchMyPapers();
+      },
+      { immediate: true }
+    );
+
+    const favoritePosts = computed(() =>
+      store.state.currentUser
+        ? store.state.allPosts.filter(p => (p.favorites || []).includes(store.state.currentUser.id))
+        : []
+    );
+
+    function getFileName(url) {
+      if (!url) return '';
+      const name = url.split('/').pop();
+      const idx = name.indexOf('-');
+      return idx >= 0 ? name.slice(idx + 1) : name;
+    }
+
+    return { store, getInitial, formatDate, favoritePosts, getFileName };
   },
   template: `
     <section class="view-shell">
@@ -173,6 +197,83 @@ const UserPage = {
             <p>{{ store.state.currentUser?.institution || '学术难民' }}</p>
           </div>
           <button class="auth-btn-ghost" @click="store.logout()">退出登录</button>
+        </div>
+
+        <div class="user-tabs">
+          <button
+            class="user-tab"
+            :class="{ active: store.state.userTab === 'papers' }"
+            @click="store.setUserTab('papers')"
+          >
+            <strong>我的论文</strong>
+            <span>{{ store.state.myPapers.length }} 篇</span>
+          </button>
+          <button
+            class="user-tab"
+            :class="{ active: store.state.userTab === 'posts' }"
+            @click="store.setUserTab('posts')"
+          >
+            <strong>我的帖子</strong>
+            <span>{{ store.myPosts.length }} 篇</span>
+          </button>
+          <button
+            class="user-tab"
+            :class="{ active: store.state.userTab === 'favorites' }"
+            @click="store.setUserTab('favorites')"
+          >
+            <strong>我的收藏</strong>
+            <span>{{ favoritePosts.length }} 篇</span>
+          </button>
+        </div>
+
+        <div v-if="store.state.userTab === 'papers'" class="user-content">
+          <div v-if="store.state.loadingMyPapers" class="grid-state">
+            <div class="loading-card" v-for="item in 3" :key="item"></div>
+          </div>
+          <div v-else-if="store.state.myPapers.length" class="paper-list">
+            <article v-for="paper in store.state.myPapers" :key="paper.id" class="paper-card">
+              <div class="paper-card-icon"><AppIcon name="file-text" /></div>
+              <div class="paper-card-content">
+                <h4>{{ paper.title }}</h4>
+                <p v-if="paper.description">{{ paper.description }}</p>
+                <div class="paper-card-meta">
+                  <span v-if="paper.file_url" class="paper-file-badge">
+                    <AppIcon name="paperclip" />
+                    {{ getFileName(paper.file_url) }}
+                  </span>
+                  <span>{{ formatDate(paper.created_at) }}</span>
+                  <span><AppIcon name="eye" /> {{ paper.views || 0 }}</span>
+                  <span><AppIcon name="star" /> {{ paper.stars || 0 }}</span>
+                </div>
+                <div v-if="paper.tags?.length" class="post-tags">
+                  <span v-for="tag in paper.tags.slice(0, 4)" :key="tag" class="post-tag">#{{ tag }}</span>
+                </div>
+              </div>
+              <button class="paper-delete-btn" @click="store.deletePaper(paper.id)">
+                <AppIcon name="trash-2" />
+              </button>
+            </article>
+          </div>
+          <div v-else class="empty-card">
+            <strong>还没有上传论文</strong>
+            <p>点击右下角 + 按钮上传你的第一篇论文</p>
+          </div>
+        </div>
+
+        <div v-if="store.state.userTab === 'posts'" class="user-content">
+          <PostGrid
+            :posts="store.myPosts"
+            empty-title="还没有发布帖子"
+            empty-description="去论坛发一篇帖子吧"
+          />
+        </div>
+
+        <div v-if="store.state.userTab === 'favorites'" class="user-content">
+          <PostGrid
+            :posts="favoritePosts"
+            empty-title="还没有收藏内容"
+            empty-description="浏览帖子时点击收藏按钮即可添加"
+          />
         </div>
       </div>
       <div v-else class="user-guest-state">

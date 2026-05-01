@@ -31,7 +31,10 @@ export function createAppStore(router) {
     publishSubmitting: false,
     showPostModal: false,
     selectedPost: null,
-    detailLoading: false
+    detailLoading: false,
+    myPapers: [],
+    loadingMyPapers: false,
+    userTab: 'papers'
   });
 
   const isLoggedIn = computed(() => Boolean(state.token && state.currentUser));
@@ -131,6 +134,12 @@ export function createAppStore(router) {
       }
     ];
   });
+
+  const myPosts = computed(() =>
+    state.currentUser
+      ? state.allPosts.filter(p => p.authorId === state.currentUser.id)
+      : []
+  );
 
   async function fetchAllPosts() {
     state.loadingAll = true;
@@ -353,6 +362,59 @@ export function createAppStore(router) {
     }
   }
 
+  async function fetchMyPapers() {
+    if (!isLoggedIn.value) return;
+    state.loadingMyPapers = true;
+    try {
+      const data = await request(`${API}/papers?author=me`, {
+        headers: { Authorization: `Bearer ${state.token}` }
+      });
+      state.myPapers = data.papers || [];
+    } catch {
+      state.myPapers = [];
+    } finally {
+      state.loadingMyPapers = false;
+    }
+  }
+
+  async function deletePaper(paperId) {
+    await request(`${API}/papers/${paperId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${state.token}` }
+    });
+    await fetchMyPapers();
+  }
+
+  async function publishPaper(payload) {
+    if (!isLoggedIn.value) {
+      openAuthModal('login');
+      return;
+    }
+    state.publishSubmitting = true;
+    try {
+      await request(`${API}/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${state.token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      closePublishModal();
+      state.activeFeed = 'latest';
+      await Promise.all([refreshAll(), fetchMyPapers()]);
+      if (router.currentRoute.value.name !== 'home') {
+        router.push({ name: 'home' });
+      }
+    } finally {
+      state.publishSubmitting = false;
+    }
+  }
+
+  function setUserTab(tab) {
+    state.userTab = tab;
+  }
+
   return reactive({
     state,
     isLoggedIn,
@@ -378,7 +440,12 @@ export function createAppStore(router) {
     publishPost,
     openPost,
     closePostModal,
-    toggleFavorite
+    toggleFavorite,
+    myPosts,
+    fetchMyPapers,
+    deletePaper,
+    publishPaper,
+    setUserTab
   });
 }
 

@@ -32,7 +32,35 @@ async function authMiddleware(req, res, next) {
 // GET /api/papers - 获取论文列表
 router.get('/', async (req, res) => {
   try {
-    const { tab, search, tag } = req.query;
+    const { tab, search, tag, author } = req.query;
+
+    // author=me: 获取当前用户的论文
+    if (author === 'me') {
+      const auth = req.headers.authorization;
+      if (!auth || !auth.startsWith('Bearer ')) {
+        return res.status(401).json({ error: '请先登录' });
+      }
+      try {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
+        const userId = decoded.userId;
+
+        const { data, error } = await supabase
+          .from('papers')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('获取我的论文失败:', error);
+          return res.status(500).json({ error: '获取论文列表失败' });
+        }
+        return res.status(200).json({ papers: data || [] });
+      } catch {
+        return res.status(401).json({ error: 'Token 无效' });
+      }
+    }
+
     let query = supabase
       .from('papers')
       .select('*')

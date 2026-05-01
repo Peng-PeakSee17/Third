@@ -822,14 +822,60 @@ export const PublishModal = {
   components: { AppIcon },
   setup() {
     const store = useAppStore();
+    const publishType = ref(null);
+    const isDragOver = ref(false);
+    const selectedFile = ref(null);
+    const fileError = ref('');
     const form = reactive({
       title: '',
       content: '',
-      tags: ''
+      tags: '',
+      description: ''
     });
     const error = reactive({ message: '' });
 
-    async function submit() {
+    function selectType(type) {
+      publishType.value = type;
+      error.message = '';
+    }
+
+    function goBack() {
+      publishType.value = null;
+      error.message = '';
+      fileError.value = '';
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      validateAndSetFile(file);
+    }
+
+    function handleFileDrop(event) {
+      event.preventDefault();
+      isDragOver.value = false;
+      const file = event.dataTransfer.files[0];
+      validateAndSetFile(file);
+    }
+
+    function validateAndSetFile(file) {
+      fileError.value = '';
+      if (!file) return;
+      if (!file.name.match(/\.(pdf|doc|docx)$/i)) {
+        fileError.value = '仅支持 PDF、DOC、DOCX 格式';
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        fileError.value = '文件大小不能超过 10MB';
+        return;
+      }
+      selectedFile.value = file;
+    }
+
+    function removeFile() {
+      selectedFile.value = null;
+    }
+
+    async function submitPost() {
       error.message = '';
       if (!form.title.trim()) {
         error.message = '标题不能为空';
@@ -843,11 +889,40 @@ export const PublishModal = {
         await store.publishPost({
           title: form.title.trim(),
           content: form.content.trim(),
-          tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean)
+          tags: form.tags.split(',').map(t => t.trim()).filter(Boolean)
         });
-        form.title = '';
-        form.content = '';
-        form.tags = '';
+      } catch (err) {
+        error.message = err.message;
+      }
+    }
+
+    async function submitPaper() {
+      error.message = '';
+      if (!form.title.trim()) {
+        error.message = '标题不能为空';
+        return;
+      }
+      if (!selectedFile.value) {
+        error.message = '请上传论文文件';
+        return;
+      }
+      try {
+        const reader = new FileReader();
+        const fileData = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(selectedFile.value);
+        });
+
+        await store.publishPaper({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
+          fileData,
+          fileName: selectedFile.value.name,
+          contentType: selectedFile.value.type,
+          institution: store.state.currentUser?.institution || ''
+        });
       } catch (err) {
         error.message = err.message;
       }
@@ -859,7 +934,11 @@ export const PublishModal = {
       }
     }
 
-    return { store, form, error, submit, closeOnMask };
+    return {
+      store, publishType, isDragOver, form, selectedFile, fileError, error,
+      selectType, goBack, handleFileSelect, handleFileDrop, removeFile,
+      submitPost, submitPaper, closeOnMask
+    };
   },
   template: `
     <div v-if="store.state.showPublishModal" class="modal-mask" @click="closeOnMask">
@@ -867,27 +946,112 @@ export const PublishModal = {
         <button class="auth-close-btn" @click="store.closePublishModal()">
           <AppIcon name="x" />
         </button>
-        <span class="eyebrow">Publish Draft</span>
-        <h3>发布新内容</h3>
-        <label class="form-field">
-          <span>标题</span>
-          <input v-model="form.title" type="text" placeholder="给你的内容起个标题">
-        </label>
-        <label class="form-field">
-          <span>内容</span>
-          <textarea v-model="form.content" rows="6" placeholder="补充内容、摘要或者吐槽"></textarea>
-        </label>
-        <label class="form-field">
-          <span>标签</span>
-          <input v-model="form.tags" type="text" placeholder="论文, 作业, 速成, 熬夜">
-        </label>
-        <span v-if="error.message" class="form-error">{{ error.message }}</span>
-        <div class="modal-actions">
-          <button class="ghost-button" @click="store.closePublishModal()">取消</button>
-          <button class="primary-button" :disabled="store.state.publishSubmitting" @click="submit">
-            {{ store.state.publishSubmitting ? '发布中...' : '立即发布' }}
-          </button>
-        </div>
+
+        <template v-if="!publishType">
+          <span class="eyebrow">Create New</span>
+          <h3>发布新内容</h3>
+          <div class="publish-type-grid">
+            <button class="publish-type-card" @click="selectType('post')">
+              <div class="publish-type-icon"><AppIcon name="message-square" /></div>
+              <strong>发帖讨论</strong>
+              <p>分享想法、吐槽、学习心得</p>
+            </button>
+            <button class="publish-type-card" @click="selectType('paper')">
+              <div class="publish-type-icon"><AppIcon name="file-text" /></div>
+              <strong>上传论文</strong>
+              <p>上传 PDF / DOC 论文文件</p>
+            </button>
+          </div>
+        </template>
+
+        <template v-else-if="publishType === 'post'">
+          <div class="publish-back" @click="goBack">
+            <AppIcon name="arrow-left" />
+            <span>返回选择</span>
+          </div>
+          <span class="eyebrow">Post</span>
+          <h3>发帖讨论</h3>
+          <label class="form-field">
+            <span>标题</span>
+            <input v-model="form.title" type="text" placeholder="给你的内容起个标题">
+          </label>
+          <label class="form-field">
+            <span>内容</span>
+            <textarea v-model="form.content" rows="6" placeholder="补充内容、摘要或者吐槽"></textarea>
+          </label>
+          <label class="form-field">
+            <span>标签</span>
+            <input v-model="form.tags" type="text" placeholder="论文, 作业, 速成, 熬夜">
+          </label>
+          <span v-if="error.message" class="form-error">{{ error.message }}</span>
+          <div class="modal-actions">
+            <button class="ghost-button" @click="goBack">返回</button>
+            <button class="primary-button" :disabled="store.state.publishSubmitting" @click="submitPost">
+              {{ store.state.publishSubmitting ? '发布中...' : '立即发布' }}
+            </button>
+          </div>
+        </template>
+
+        <template v-else-if="publishType === 'paper'">
+          <div class="publish-back" @click="goBack">
+            <AppIcon name="arrow-left" />
+            <span>返回选择</span>
+          </div>
+          <span class="eyebrow">Paper</span>
+          <h3>上传论文</h3>
+          <label class="form-field">
+            <span>论文标题</span>
+            <input v-model="form.title" type="text" placeholder="论文标题">
+          </label>
+          <label class="form-field">
+            <span>描述 / 摘要</span>
+            <textarea v-model="form.description" rows="3" placeholder="简要描述论文内容（选填）"></textarea>
+          </label>
+          <div class="form-field">
+            <span>论文文件</span>
+            <div
+              class="file-drop-zone"
+              :class="{ 'has-file': selectedFile, 'drag-over': isDragOver }"
+              @click="$refs.fileInput.click()"
+              @dragover.prevent="isDragOver = true"
+              @dragleave.prevent="isDragOver = false"
+              @drop="handleFileDrop"
+            >
+              <input ref="fileInput" type="file" accept=".pdf,.doc,.docx" style="display:none" @change="handleFileSelect">
+              <template v-if="selectedFile">
+                <div class="file-info">
+                  <AppIcon name="file-text" />
+                  <div>
+                    <strong>{{ selectedFile.name }}</strong>
+                    <span>{{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</span>
+                  </div>
+                </div>
+                <button class="file-remove" @click.stop="removeFile">
+                  <AppIcon name="x" />
+                </button>
+              </template>
+              <template v-else>
+                <div class="file-placeholder">
+                  <AppIcon name="upload" />
+                  <strong>点击或拖拽文件到此处</strong>
+                  <span>支持 PDF、DOC、DOCX，最大 10MB</span>
+                </div>
+              </template>
+            </div>
+            <span v-if="fileError" class="form-error">{{ fileError }}</span>
+          </div>
+          <label class="form-field">
+            <span>标签</span>
+            <input v-model="form.tags" type="text" placeholder="论文, 毕业论文, 计算机科学">
+          </label>
+          <span v-if="error.message" class="form-error">{{ error.message }}</span>
+          <div class="modal-actions">
+            <button class="ghost-button" @click="goBack">返回</button>
+            <button class="primary-button" :disabled="store.state.publishSubmitting" @click="submitPaper">
+              {{ store.state.publishSubmitting ? '上传中...' : '上传论文' }}
+            </button>
+          </div>
+        </template>
       </div>
     </div>
   `
