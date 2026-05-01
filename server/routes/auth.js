@@ -16,15 +16,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 router.post('/register', async (req, res) => {
-  const { username, password, institution } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: '用户名和密码必填' });
+  const { username, email, password, institution } = req.body;
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: '用户名、邮箱和密码必填' });
   }
 
   try {
     // Supabase Auth: 注册用户
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: `${username}@pengpalm.cn`,
+      email,
       password: password,
     });
 
@@ -42,6 +42,7 @@ router.post('/register', async (req, res) => {
         {
           id: authData.user.id,
           username: username,
+          email,
           institution: institution || '匿名学术难民',
           favorites: [],
           created_at: new Date().toISOString()
@@ -53,14 +54,14 @@ router.post('/register', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: authData.user.id, username },
+      { userId: authData.user.id, username, email },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.json({
       token,
-      user: { id: authData.user.id, username, institution: institution || '匿名学术难民' }
+      user: { id: authData.user.id, username, institution: institution || '匿名学术难民', email }
     });
   } catch (err) {
     console.error('注册错误:', err);
@@ -69,44 +70,44 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: '用户名和密码必填' });
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: '邮箱和密码必填' });
   }
 
   try {
     // Supabase Auth: 登录
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: `${username}@pengpalm.cn`,
+      email,
       password: password,
     });
 
     if (authError) {
-      return res.status(401).json({ error: '用户名或密码错误' });
+      return res.status(401).json({ error: '邮箱或密码错误' });
     }
 
     // 获取用户信息
     const { data: userData } = await supabase
       .from('users')
       .select('*')
-      .eq('id', authData.user.id)
+      .eq('email', email)
       .single();
 
     const user = userData || {
       id: authData.user.id,
-      username: username,
+      username: email.split('@')[0],
       institution: '匿名学术难民'
     };
 
     const token = jwt.sign(
-      { userId: authData.user.id, username: user.username },
+      { userId: authData.user.id, username: user.username, email },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.json({
       token,
-      user: { id: authData.user.id, username: user.username, institution: user.institution }
+      user: { id: authData.user.id, username: user.username, institution: user.institution, email }
     });
   } catch (err) {
     console.error('登录错误:', err);
@@ -190,7 +191,7 @@ router.post('/verify-register', async (req, res) => {
 
     // Supabase Auth: 注册用户
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: `${payload.username}@pengpalm.cn`,
+      email: payload.email,
       password: payload.password,
     });
 
@@ -220,14 +221,14 @@ router.post('/verify-register', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: authData.user.id, username: payload.username },
+      { userId: authData.user.id, username: payload.username, email: payload.email },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.json({
       token,
-      user: { id: authData.user.id, username: payload.username, institution: payload.institution || '匿名学术难民' }
+      user: { id: authData.user.id, username: payload.username, institution: payload.institution || '匿名学术难民', email: payload.email }
     });
   } catch (err) {
     console.error('验证注册错误:', err);

@@ -615,9 +615,17 @@ export const AuthModal = {
     async function submit() {
       error.message = '';
 
-      if (!form.username.trim()) {
-        error.message = '用户名不能为空';
-        return;
+      if (store.state.authMode === 'login') {
+        if (!form.email.trim()) {
+          error.message = '邮箱不能为空';
+          return;
+        }
+      }
+      if (store.state.authMode === 'register') {
+        if (!form.username.trim()) {
+          error.message = '用户名不能为空';
+          return;
+        }
       }
       if (store.state.authMode === 'register' && /[^\x00-\x7F]/.test(form.username)) {
         error.message = '用户名仅支持英文、数字和符号';
@@ -655,7 +663,7 @@ export const AuthModal = {
           startCountdown();
         } else {
           await store.submitAuth({
-            username: form.username.trim(),
+            email: form.email.trim(),
             password: form.password
           });
           form.username = '';
@@ -760,12 +768,18 @@ export const AuthModal = {
               <button :class="['auth-tab', { active: store.state.authMode === 'register' }]" @click="store.state.authMode = 'register'">注册</button>
             </div>
             <div class="auth-fields">
+              <template v-if="store.state.authMode === 'login'">
+                <label class="auth-field">
+                  <span class="auth-field-label">邮箱</span>
+                  <input v-model="form.email" type="email" class="auth-field-input" placeholder="输入你的邮箱地址">
+                </label>
+              </template>
+              <template v-if="store.state.authMode === 'register'">
               <label class="auth-field">
                 <span class="auth-field-label">用户名</span>
                 <input v-model="form.username" type="text" class="auth-field-input" placeholder="输入你的学术昵称">
                 <span v-if="usernameHasChinese" class="auth-hint">建议使用英文或拼音，部分邮件系统可能不支持中文用户名</span>
               </label>
-              <template v-if="store.state.authMode === 'register'">
                 <label class="auth-field">
                   <span class="auth-field-label">邮箱</span>
                   <input v-model="form.email" type="email" class="auth-field-input" placeholder="输入你的邮箱地址">
