@@ -154,7 +154,11 @@ router.post('/send-code', async (req, res) => {
     }
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
-    storeCode(email, code, { username, email, password, institution });
+    const stored = storeCode(email, code, { username, email, password, institution });
+
+    if (!stored) {
+      return res.json({ message: '验证码已发送，请查看邮箱' });
+    }
 
     await resend.emails.send({
       from: 'Third <noreply@pengpalm.cn>',

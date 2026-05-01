@@ -13,11 +13,16 @@ function cleanup() {
 
 function storeCode(email, code, payload) {
   cleanup();
+  const existing = codes.get(email);
+  if (existing && Date.now() < existing.expiresAt) {
+    return false;
+  }
   codes.set(email, {
     code,
     payload,
     expiresAt: Date.now() + EXPIRES_MS
   });
+  return true;
 }
 
 function verifyCode(email, code) {
