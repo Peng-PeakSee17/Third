@@ -3,6 +3,7 @@ import {
   ref,
   reactive,
   watch,
+  onMounted,
   onUnmounted
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -131,7 +132,7 @@ export const AppHeader = {
           <button v-if="!store.isLoggedIn" class="login-button" @click="store.openAuthModal('login')">
             <span>LOG IN</span>
           </button>
-          <button v-else class="login-button" @click="store.openAuthModal('login')">
+          <button v-else class="login-button" @click="go('user')">
             <span>{{ store.state.currentUser?.username }}</span>
           </button>
         </div>
@@ -170,7 +171,7 @@ export const AppHeader = {
               <AppIcon name="log-in" />
               <span>登录 / 注册</span>
             </button>
-            <button class="menu-login-btn logged-in" v-else>
+            <button class="menu-login-btn logged-in" v-else @click="go('user'); closeMenu()">
               <span class="avatar-circle">{{ getInitial(store.state.currentUser?.username) }}</span>
               <span>{{ store.state.currentUser?.username }}</span>
             </button>
@@ -533,6 +534,9 @@ export const AuthModal = {
     const registerStep = ref('form');
     const verificationCode = ref('');
     const resendCountdown = ref(0);
+    const registerSuccess = ref(false);
+    const universityList = ref([]);
+    const universitySuggestions = ref([]);
     let countdownTimer = null;
 
     function startCountdown() {
@@ -551,12 +555,63 @@ export const AuthModal = {
       clearInterval(countdownTimer);
     });
 
+    let cachedUniversityList = null;
+
+    onMounted(async () => {
+      if (!cachedUniversityList) {
+        try {
+          const response = await fetch('https://cdn.jsdelivr.net/gh/codeudan/crawler-china-mainland-universities/china_mainland_universities.json');
+          const data = await response.json();
+          cachedUniversityList = [];
+          if (Array.isArray(data)) {
+            cachedUniversityList = data.map((item) => ({ name: item.name, province: item.province || '' }));
+          } else {
+            for (const [province, unis] of Object.entries(data)) {
+              if (Array.isArray(unis)) {
+                for (const uni of unis) {
+                  const name = typeof uni === 'string' ? uni : uni.name;
+                  cachedUniversityList.push({ name, province });
+                }
+              }
+            }
+          }
+        } catch {
+          cachedUniversityList = [];
+        }
+      }
+      universityList.value = cachedUniversityList;
+    });
+
+    function filterUniversities() {
+      const keyword = form.institution.trim();
+      if (!keyword) {
+        universitySuggestions.value = [];
+        return;
+      }
+      const lower = keyword.toLowerCase();
+      universitySuggestions.value = universityList.value
+        .filter((u) => u.name.toLowerCase().includes(lower))
+        .slice(0, 8);
+    }
+
+    function selectUniversity(name) {
+      form.institution = name;
+      universitySuggestions.value = [];
+    }
+
+    function onInstitutionBlur() {
+      setTimeout(() => {
+        universitySuggestions.value = [];
+      }, 200);
+    }
+
     watch(
       () => store.state.showAuthModal,
       (open) => {
         if (open) {
           error.message = '';
           registerStep.value = 'form';
+          registerSuccess.value = false;
           verificationCode.value = '';
           resendCountdown.value = 0;
           clearInterval(countdownTimer);
@@ -628,12 +683,16 @@ export const AuthModal = {
           email: form.email.trim(),
           code: verificationCode.value.trim()
         });
-        form.username = '';
-        form.email = '';
-        form.password = '';
-        form.confirmPassword = '';
-        form.institution = '';
+        registerSuccess.value = true;
         verificationCode.value = '';
+        setTimeout(() => {
+          store.closeAuthModal();
+          form.username = '';
+          form.email = '';
+          form.password = '';
+          form.confirmPassword = '';
+          form.institution = '';
+        }, 2000);
       } catch (err) {
         error.message = err.message;
       }
@@ -661,19 +720,29 @@ export const AuthModal = {
       store.closeAuthModal();
     }
 
-    return { store, form, error, registerStep, verificationCode, resendCountdown, submit, verifyCode, resendCode, closeOnMask };
+    return { store, form, error, registerStep, registerSuccess, verificationCode, resendCountdown, universitySuggestions, submit, verifyCode, resendCode, closeOnMask, filterUniversities, selectUniversity, onInstitutionBlur };
   },
   template: `
-    <div v-if="store.state.showAuthModal" class="modal-mask auth-modal-mask" @click="closeOnMask">
+    <div v-if="store.state.showAuthModal" class="modal-mask auth-modal-mask" @click="registerStep === 'code' && store.state.authMode === 'register' ? null : closeOnMask">
       <div class="modal-panel auth-panel">
         <button class="icon-button floating-close" @click="store.closeAuthModal()">
           <AppIcon name="x" />
         </button>
         <span class="eyebrow">{{ store.state.authMode === 'register' ? 'Create Account' : 'Welcome Back' }}</span>
         <h3>{{ store.state.authMode === 'register' ? '注册账号' : '登录继续浏览' }}</h3>
-        <p>保留收藏、发布内容和查看完整详情都依赖账号状态。</p>
+        <p v-if="store.state.authMode === 'login'">保留收藏、发布内容和查看完整详情都依赖账号状态。</p>
 
-        <template v-if="store.state.authMode === 'register' && registerStep === 'code'">
+        <template v-if="registerSuccess">
+          <div class="register-success">
+            <div class="register-success-icon">
+              <AppIcon name="check-circle" />
+            </div>
+            <h3>注册成功</h3>
+            <p>欢迎加入，{{ form.username }}！</p>
+          </div>
+        </template>
+
+        <template v-else-if="store.state.authMode === 'register' && registerStep === 'code'">
           <p>验证码已发送到 <strong>{{ form.email }}</strong></p>
           <label class="form-field">
             <span>验证码</span>
@@ -719,7 +788,10 @@ export const AuthModal = {
 
           <label v-if="store.state.authMode === 'register'" class="form-field">
             <span>所属大学</span>
-            <input v-model="form.institution" type="text" placeholder="例如：门头沟学院">
+            <input v-model="form.institution" type="text" placeholder="搜索你的大学..." @input="filterUniversities" @blur="onInstitutionBlur">
+            <ul v-if="universitySuggestions.length" class="university-dropdown">
+              <li v-for="item in universitySuggestions" :key="item.name" @mousedown.prevent="selectUniversity(item.name)">{{ item.name }}</li>
+            </ul>
           </label>
 
           <span v-if="error.message" class="form-error">{{ error.message }}</span>
