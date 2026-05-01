@@ -619,6 +619,10 @@ export const AuthModal = {
         error.message = '用户名不能为空';
         return;
       }
+      if (store.state.authMode === 'register' && /[^\x00-\x7F]/.test(form.username)) {
+        error.message = '用户名仅支持英文、数字和符号';
+        return;
+      }
       if (!form.password) {
         error.message = '密码不能为空';
         return;

@@ -126,6 +126,10 @@ router.post('/send-code', async (req, res) => {
     return res.status(400).json({ error: '邮箱格式不正确' });
   }
 
+  if (/[^\x00-\x7F]/.test(username)) {
+    return res.status(400).json({ error: '用户名仅支持英文、数字和符号' });
+  }
+
   try {
     // 检查用户名是否已存在（通过 Supabase Auth 的 email 映射）
     const { data: existingUser } = await supabase
