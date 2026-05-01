@@ -24,7 +24,7 @@ router.post('/register', async (req, res) => {
   try {
     // Supabase Auth: 注册用户
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: `${username}@academic.local`,
+      email: `${username}@pengpalm.cn`,
       password: password,
     });
 
@@ -77,7 +77,7 @@ router.post('/login', async (req, res) => {
   try {
     // Supabase Auth: 登录
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: `${username}@academic.local`,
+      email: `${username}@pengpalm.cn`,
       password: password,
     });
 
@@ -190,7 +190,7 @@ router.post('/verify-register', async (req, res) => {
 
     // Supabase Auth: 注册用户
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: `${payload.username}@academic.local`,
+      email: `${payload.username}@pengpalm.cn`,
       password: payload.password,
     });
 
