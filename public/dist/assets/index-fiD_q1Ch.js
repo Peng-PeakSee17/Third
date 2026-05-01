@@ -267,7 +267,7 @@ var e=Object.defineProperty,t=(t,n)=>{let r={};for(var i in t)e(r,i,{get:t[i],en
                 </div>
               </label>
               <label v-if="store.state.authMode === 'register'" class="auth-field auth-field-uni">
-                <span class="auth-field-label">所属大学</span>
+                <span class="auth-field-label">所属大学（可选）</span>
                 <input v-model="form.institution" type="text" class="auth-field-input" placeholder="搜索你的大学..." @input="filterUniversities" @blur="onInstitutionBlur">
                 <ul v-if="universitySuggestions.length" class="auth-uni-list">
                   <li v-for="item in universitySuggestions" :key="item.name" @mousedown.prevent="selectUniversity(item.name)">{{ item.name }}</li>
