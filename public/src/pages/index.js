@@ -8,6 +8,7 @@ import {
   StatsStrip
 } from '../components/index.js';
 import { useAppStore } from '../store/appStore.js';
+import { getInitial } from '../utils/ui.js';
 
 const HomePage = {
   components: { Banner, PostGrid },
@@ -106,19 +107,25 @@ const ForumPage = {
 };
 
 const SubmitPage = {
-  components: { Banner },
   setup() {
     const store = useAppStore();
+    if (!store.isLoggedIn) {
+      store.openAuthModal('login');
+    }
     return { store };
   },
   template: `
     <section class="view-shell">
-      <Banner title="SUBMIT" subtitle="插足上报" variant="green" />
-
-      <div class="page-panel">
-        <button class="primary-button" @click="store.openPublishModal()">
-          <span>发布新内容</span>
-        </button>
+      <div v-if="store.isLoggedIn" class="submit-hero">
+        <h2>投稿</h2>
+        <p>将你的学术内容分享给社区。</p>
+        <button class="primary-button" @click="store.openPublishModal()">发布新内容</button>
+      </div>
+      <div v-else class="user-guest-state">
+        <div class="user-guest-icon">!</div>
+        <h2>请先登录</h2>
+        <p>登录后即可发布内容。</p>
+        <button class="auth-btn-primary" @click="store.openAuthModal('login')">登录</button>
       </div>
     </section>
   `
@@ -152,24 +159,30 @@ const TrendingPage = {
 };
 
 const UserPage = {
-  components: { Banner },
   setup() {
     const store = useAppStore();
-    return { store };
+    return { store, getInitial };
   },
   template: `
     <section class="view-shell">
-      <Banner title="USER" subtitle="局中人" variant="blue" />
-
-      <div class="page-panel">
-        <div v-if="store.isLoggedIn" class="user-info">
-          <span class="avatar-circle large">{{ store.state.currentUser?.username?.charAt(0) }}</span>
-          <h3>{{ store.state.currentUser?.username }}</h3>
-          <p>{{ store.state.currentUser?.institution }}</p>
+      <div v-if="store.isLoggedIn" class="user-profile-card">
+        <div class="user-profile-header">
+          <span class="avatar-circle large">{{ getInitial(store.state.currentUser?.username) }}</span>
+          <div class="user-profile-info">
+            <h2>{{ store.state.currentUser?.username }}</h2>
+            <p>{{ store.state.currentUser?.institution || '学术难民' }}</p>
+          </div>
+          <button class="auth-btn-ghost" @click="store.logout()">退出登录</button>
         </div>
-        <button v-else class="primary-button" @click="store.openAuthModal('login')">
-          <span>登录以查看</span>
-        </button>
+      </div>
+      <div v-else class="user-guest-state">
+        <div class="user-guest-icon">?</div>
+        <h2>请先登录</h2>
+        <p>登录后可以查看个人资料、收藏内容和发布记录。</p>
+        <div class="user-guest-actions">
+          <button class="auth-btn-primary" @click="store.openAuthModal('login')">登录</button>
+          <button class="auth-btn-ghost" @click="store.openAuthModal('register')">注册新账号</button>
+        </div>
       </div>
     </section>
   `
@@ -180,7 +193,7 @@ const DiscoverPage = {
   setup() {
     const store = useAppStore();
     const categoryCards = computed(() =>
-      store.trendingTags.value.slice(0, 4).map((tag, index) => ({
+      store.trendingTags.slice(0, 4).map((tag, index) => ({
         title: tag.tag,
         count: tag.count,
         accent: ['Violet', 'Mint', 'Blue', 'Rose'][index] || 'Trend'
@@ -270,7 +283,7 @@ const SearchPage = {
   components: { HeroBanner, PostGrid },
   setup() {
     const store = useAppStore();
-    const suggestions = computed(() => store.trendingTags.value.slice(0, 6));
+    const suggestions = computed(() => store.trendingTags.slice(0, 6));
     return { store, suggestions };
   },
   template: `

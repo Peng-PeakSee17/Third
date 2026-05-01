@@ -14,15 +14,6 @@ function parseStoredUser(value) {
   }
 }
 
-async function request(url, options = {}) {
-  const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || '请求失败');
-  }
-  return data;
-}
-
 export function createAppStore(router) {
   const state = reactive({
     token: localStorage.getItem('token') || '',
@@ -44,6 +35,30 @@ export function createAppStore(router) {
   });
 
   const isLoggedIn = computed(() => Boolean(state.token && state.currentUser));
+
+  function clearSession() {
+    state.token = '';
+    state.currentUser = null;
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  }
+
+  async function request(url, options = {}) {
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch {
+      throw new Error('网络连接失败，请检查服务器是否启动');
+    }
+    if (response.status === 401 && isLoggedIn.value) {
+      clearSession();
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || '请求失败');
+    }
+    return data;
+  }
 
   const dashboardCards = computed(() => {
     const totalPosts = state.allPosts.length;
@@ -122,6 +137,8 @@ export function createAppStore(router) {
     try {
       const data = await request(`${API}/posts`);
       state.allPosts = data.posts || [];
+    } catch {
+      state.allPosts = [];
     } finally {
       state.loadingAll = false;
     }
@@ -152,6 +169,8 @@ export function createAppStore(router) {
 
       const data = await request(url, options);
       state.feedPosts = data.posts || [];
+    } catch {
+      state.feedPosts = [];
     } finally {
       state.loadingFeed = false;
     }
@@ -162,7 +181,7 @@ export function createAppStore(router) {
   }
 
   async function bootstrap() {
-    await refreshAll();
+    await refreshAll().catch(() => {});
   }
 
   function setFeed(tab) {
@@ -239,11 +258,11 @@ export function createAppStore(router) {
   }
 
   function logout() {
-    state.token = '';
-    state.currentUser = null;
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    refreshAll();
+    clearSession();
+    refreshAll().catch(() => {});
+    if (router.currentRoute.value.name !== 'home') {
+      router.push({ name: 'home' });
+    }
   }
 
   function openPublishModal() {
@@ -334,7 +353,7 @@ export function createAppStore(router) {
     }
   }
 
-  return {
+  return reactive({
     state,
     isLoggedIn,
     dashboardCards,
@@ -360,7 +379,7 @@ export function createAppStore(router) {
     openPost,
     closePostModal,
     toggleFavorite
-  };
+  });
 }
 
 export function useAppStore() {

@@ -56,6 +56,10 @@ export const AppHeader = {
     ];
 
     function go(name) {
+      if ((name === 'user' || name === 'submit') && !store.isLoggedIn) {
+        store.openAuthModal('login');
+        return;
+      }
       router.push({ name });
     }
 
@@ -124,15 +128,12 @@ export const AppHeader = {
           </div>
         </div>
         <div class="header-right">
-          <div class="header-search">
-            <button class="header-search-btn" @click="goSearch">
-              <AppIcon name="search" />
-            </button>
-          </div>
-          <button v-if="!store.isLoggedIn" class="login-button" @click="store.openAuthModal('login')">
-            <span>LOG IN</span>
+          <button class="header-search-btn" @click="goSearch">
+            <AppIcon name="search" />
           </button>
-          <button v-else class="login-button" @click="go('user')">
+          <button v-if="!store.isLoggedIn" class="header-login-btn" @click="store.openAuthModal('login')">登录</button>
+          <button v-else class="header-user-btn" @click="go('user')">
+            <span class="avatar-circle small">{{ getInitial(store.state.currentUser?.username) }}</span>
             <span>{{ store.state.currentUser?.username }}</span>
           </button>
         </div>
@@ -320,21 +321,6 @@ export const HeroBanner = {
             <AppIcon name="arrow-right" />
             <span>{{ secondaryLabel }}</span>
           </button>
-        </div>
-      </div>
-
-      <div class="hero-metric-board">
-        <div class="metric-chip">
-          <span>Dark Theme</span>
-          <strong>Vue 3</strong>
-        </div>
-        <div class="metric-chip">
-          <span>Page Split</span>
-          <strong>4 Views</strong>
-        </div>
-        <div class="metric-chip">
-          <span>Interaction</span>
-          <strong>Modal + Feed</strong>
         </div>
       </div>
     </section>
@@ -537,6 +523,9 @@ export const AuthModal = {
     const registerSuccess = ref(false);
     const universityList = ref([]);
     const universitySuggestions = ref([]);
+    const showPassword = ref(false);
+    const showConfirmPassword = ref(false);
+    const usernameHasChinese = computed(() => /[\u4e00-\u9fff]/.test(form.username));
     let countdownTimer = null;
 
     function startCountdown() {
@@ -567,8 +556,12 @@ export const AuthModal = {
             cachedUniversityList = data.map((item) => ({ name: item.name, province: item.province || '' }));
           } else {
             for (const [province, unis] of Object.entries(data)) {
-              if (Array.isArray(unis)) {
-                for (const uni of unis) {
+              let list = unis;
+              if (!Array.isArray(list) && list.all) {
+                list = list.all;
+              }
+              if (Array.isArray(list)) {
+                for (const uni of list) {
                   const name = typeof uni === 'string' ? uni : uni.name;
                   cachedUniversityList.push({ name, province });
                 }
@@ -714,99 +707,94 @@ export const AuthModal = {
       }
     }
 
-    function closeOnMask(event) {
-      if (event.target !== event.currentTarget) return;
-      if (store.state.authMode === 'register' && registerStep.value === 'code') return;
-      store.closeAuthModal();
-    }
-
-    return { store, form, error, registerStep, registerSuccess, verificationCode, resendCountdown, universitySuggestions, submit, verifyCode, resendCode, closeOnMask, filterUniversities, selectUniversity, onInstitutionBlur };
+    return { store, form, error, registerStep, registerSuccess, verificationCode, resendCountdown, universitySuggestions, showPassword, showConfirmPassword, usernameHasChinese, submit, verifyCode, resendCode, filterUniversities, selectUniversity, onInstitutionBlur };
   },
   template: `
-    <div v-if="store.state.showAuthModal" class="modal-mask auth-modal-mask" @click="registerStep === 'code' && store.state.authMode === 'register' ? null : closeOnMask">
-      <div class="modal-panel auth-panel">
-        <button class="icon-button floating-close" @click="store.closeAuthModal()">
+    <div v-if="store.state.showAuthModal" class="auth-overlay">
+      <div class="auth-card">
+        <button class="auth-close-btn" @click="store.closeAuthModal()">
           <AppIcon name="x" />
         </button>
-        <span class="eyebrow">{{ store.state.authMode === 'register' ? 'Create Account' : 'Welcome Back' }}</span>
-        <h3>{{ store.state.authMode === 'register' ? '注册账号' : '登录继续浏览' }}</h3>
-        <p v-if="store.state.authMode === 'login'">保留收藏、发布内容和查看完整详情都依赖账号状态。</p>
-
-        <template v-if="registerSuccess">
-          <div class="register-success">
-            <div class="register-success-icon">
-              <AppIcon name="check-circle" />
+        <div class="auth-brand-side">
+          <div class="auth-brand-content">
+            <div class="auth-brand-logo">Third</div>
+            <h2 class="auth-brand-heading">{{ store.state.authMode === 'register' ? '加入我们' : '欢迎回来' }}</h2>
+            <p class="auth-brand-desc">{{ store.state.authMode === 'register' ? '创建账号，开启学术探索之旅' : '登录以保留收藏、发布内容' }}</p>
+          </div>
+          <div class="auth-brand-deco"></div>
+        </div>
+        <div class="auth-form-side">
+          <template v-if="registerSuccess">
+            <div class="auth-success">
+              <div class="auth-success-icon"><AppIcon name="check-circle" /></div>
+              <h3>注册成功</h3>
+              <p>欢迎加入，{{ form.username }}！</p>
             </div>
-            <h3>注册成功</h3>
-            <p>欢迎加入，{{ form.username }}！</p>
-          </div>
-        </template>
-
-        <template v-else-if="store.state.authMode === 'register' && registerStep === 'code'">
-          <p>验证码已发送到 <strong>{{ form.email }}</strong></p>
-          <label class="form-field">
-            <span>验证码</span>
-            <input v-model="verificationCode" type="text" placeholder="输入6位验证码" maxlength="6">
-          </label>
-
-          <span v-if="error.message" class="form-error">{{ error.message }}</span>
-
-          <div class="modal-actions">
-            <button class="ghost-button" :disabled="resendCountdown > 0" @click="resendCode">
-              <AppIcon name="refresh-cw" />
-              <span>{{ resendCountdown > 0 ? `重新发送 (${resendCountdown}s)` : '重新发送' }}</span>
-            </button>
-            <button class="primary-button" :disabled="store.state.authSubmitting" @click="verifyCode">
-              <AppIcon name="shield-check" />
-              <span>{{ store.state.authSubmitting ? '验证中...' : '完成注册' }}</span>
-            </button>
-          </div>
-        </template>
-
-        <template v-else>
-          <label class="form-field">
-            <span>用户名</span>
-            <input v-model="form.username" type="text" placeholder="输入你的学术昵称">
-          </label>
-
-          <template v-if="store.state.authMode === 'register'">
-            <label class="form-field">
-              <span>邮箱</span>
-              <input v-model="form.email" type="email" placeholder="输入你的邮箱地址">
-            </label>
           </template>
-
-          <label class="form-field">
-            <span>密码</span>
-            <input v-model="form.password" type="password" placeholder="设置一个不会忘的密码">
-          </label>
-
-          <label v-if="store.state.authMode === 'register'" class="form-field">
-            <span>确认密码</span>
-            <input v-model="form.confirmPassword" type="password" placeholder="再次输入密码">
-          </label>
-
-          <label v-if="store.state.authMode === 'register'" class="form-field">
-            <span>所属大学</span>
-            <input v-model="form.institution" type="text" placeholder="搜索你的大学..." @input="filterUniversities" @blur="onInstitutionBlur">
-            <ul v-if="universitySuggestions.length" class="university-dropdown">
-              <li v-for="item in universitySuggestions" :key="item.name" @mousedown.prevent="selectUniversity(item.name)">{{ item.name }}</li>
-            </ul>
-          </label>
-
-          <span v-if="error.message" class="form-error">{{ error.message }}</span>
-
-          <div class="modal-actions">
-            <button class="ghost-button" @click="store.state.authMode = store.state.authMode === 'login' ? 'register' : 'login'">
-              <AppIcon name="refresh-cw" />
-              <span>{{ store.state.authMode === 'login' ? '切换注册' : '切换登录' }}</span>
+          <template v-else-if="store.state.authMode === 'register' && registerStep === 'code'">
+            <div class="auth-form-head">
+              <h3>输入验证码</h3>
+              <p>已发送到 <strong>{{ form.email }}</strong></p>
+            </div>
+            <label class="auth-field">
+              <span class="auth-field-label">验证码</span>
+              <input v-model="verificationCode" type="text" class="auth-field-input auth-code-input" placeholder="输入6位验证码" maxlength="6">
+            </label>
+            <span v-if="error.message" class="auth-error">{{ error.message }}</span>
+            <div class="auth-btn-row">
+              <button class="auth-btn-ghost" :disabled="resendCountdown > 0" @click="resendCode">
+                {{ resendCountdown > 0 ? resendCountdown + 's 后重发' : '重新发送' }}
+              </button>
+              <button class="auth-btn-primary" :disabled="store.state.authSubmitting" @click="verifyCode">
+                {{ store.state.authSubmitting ? '验证中...' : '完成注册' }}
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="auth-tabs">
+              <button :class="['auth-tab', { active: store.state.authMode === 'login' }]" @click="store.state.authMode = 'login'">登录</button>
+              <button :class="['auth-tab', { active: store.state.authMode === 'register' }]" @click="store.state.authMode = 'register'">注册</button>
+            </div>
+            <div class="auth-fields">
+              <label class="auth-field">
+                <span class="auth-field-label">用户名</span>
+                <input v-model="form.username" type="text" class="auth-field-input" placeholder="输入你的学术昵称">
+                <span v-if="usernameHasChinese" class="auth-hint">建议使用英文或拼音，部分邮件系统可能不支持中文用户名</span>
+              </label>
+              <template v-if="store.state.authMode === 'register'">
+                <label class="auth-field">
+                  <span class="auth-field-label">邮箱</span>
+                  <input v-model="form.email" type="email" class="auth-field-input" placeholder="输入你的邮箱地址">
+                </label>
+              </template>
+              <label class="auth-field">
+                <span class="auth-field-label">密码</span>
+                <div class="auth-field-pw">
+                  <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="auth-field-input" placeholder="设置一个不会忘的密码" @compositionend="form.password = form.password.replace(/[\u4e00-\u9fff]/g, '')" @input="form.password = form.password.replace(/[\u4e00-\u9fff]/g, '')">
+                  <button type="button" class="auth-pw-toggle" @click="showPassword = !showPassword"><AppIcon :name="showPassword ? 'eye-off' : 'eye'" /></button>
+                </div>
+              </label>
+              <label v-if="store.state.authMode === 'register'" class="auth-field">
+                <span class="auth-field-label">确认密码</span>
+                <div class="auth-field-pw">
+                  <input v-model="form.confirmPassword" :type="showConfirmPassword ? 'text' : 'password'" class="auth-field-input" placeholder="再次输入密码" @compositionend="form.confirmPassword = form.confirmPassword.replace(/[\u4e00-\u9fff]/g, '')" @input="form.confirmPassword = form.confirmPassword.replace(/[\u4e00-\u9fff]/g, '')">
+                  <button type="button" class="auth-pw-toggle" @click="showConfirmPassword = !showConfirmPassword"><AppIcon :name="showConfirmPassword ? 'eye-off' : 'eye'" /></button>
+                </div>
+              </label>
+              <label v-if="store.state.authMode === 'register'" class="auth-field auth-field-uni">
+                <span class="auth-field-label">所属大学</span>
+                <input v-model="form.institution" type="text" class="auth-field-input" placeholder="搜索你的大学..." @input="filterUniversities" @blur="onInstitutionBlur">
+                <ul v-if="universitySuggestions.length" class="auth-uni-list">
+                  <li v-for="item in universitySuggestions" :key="item.name" @mousedown.prevent="selectUniversity(item.name)">{{ item.name }}</li>
+                </ul>
+              </label>
+            </div>
+            <span v-if="error.message" class="auth-error">{{ error.message }}</span>
+            <button class="auth-btn-primary auth-btn-block" :disabled="store.state.authSubmitting" @click="submit">
+              {{ store.state.authSubmitting ? '提交中...' : (store.state.authMode === 'register' ? '发送验证码' : '登录') }}
             </button>
-            <button class="primary-button" :disabled="store.state.authSubmitting" @click="submit">
-              <AppIcon name="shield-check" />
-              <span>{{ store.state.authSubmitting ? '提交中...' : (store.state.authMode === 'register' ? '发送验证码' : '确认') }}</span>
-            </button>
-          </div>
-        </template>
+          </template>
+        </div>
       </div>
     </div>
   `
@@ -858,38 +846,28 @@ export const PublishModal = {
   template: `
     <div v-if="store.state.showPublishModal" class="modal-mask" @click="closeOnMask">
       <div class="modal-panel publish-panel">
-        <button class="icon-button floating-close" @click="store.closePublishModal()">
+        <button class="auth-close-btn" @click="store.closePublishModal()">
           <AppIcon name="x" />
         </button>
         <span class="eyebrow">Publish Draft</span>
-        <h3>投放新的学术垃圾</h3>
-        <p>继续保留原有发布能力，并把表单融入新的视觉体系。</p>
-
+        <h3>发布新内容</h3>
         <label class="form-field">
           <span>标题</span>
-          <input v-model="form.title" type="text" placeholder="给这份垃圾起个醒目的标题">
+          <input v-model="form.title" type="text" placeholder="给你的内容起个标题">
         </label>
-
         <label class="form-field">
           <span>内容</span>
-          <textarea v-model="form.content" rows="7" placeholder="补充内容、摘要或者吐槽"></textarea>
+          <textarea v-model="form.content" rows="6" placeholder="补充内容、摘要或者吐槽"></textarea>
         </label>
-
         <label class="form-field">
           <span>标签</span>
           <input v-model="form.tags" type="text" placeholder="论文, 作业, 速成, 熬夜">
         </label>
-
         <span v-if="error.message" class="form-error">{{ error.message }}</span>
-
         <div class="modal-actions">
-          <button class="ghost-button" @click="store.closePublishModal()">
-            <AppIcon name="corner-down-left" />
-            <span>取消</span>
-          </button>
+          <button class="ghost-button" @click="store.closePublishModal()">取消</button>
           <button class="primary-button" :disabled="store.state.publishSubmitting" @click="submit">
-            <AppIcon name="send" />
-            <span>{{ store.state.publishSubmitting ? '发布中...' : '立即发布' }}</span>
+            {{ store.state.publishSubmitting ? '发布中...' : '立即发布' }}
           </button>
         </div>
       </div>
@@ -928,45 +906,36 @@ export const PostDetailModal = {
   template: `
     <div v-if="store.state.showPostModal" class="modal-mask" @click="closeOnMask">
       <div class="modal-panel detail-panel">
-        <button class="icon-button floating-close" @click="store.closePostModal()">
+        <button class="auth-close-btn" @click="store.closePostModal()">
           <AppIcon name="x" />
         </button>
-
-        <div v-if="store.state.detailLoading" class="detail-loading">加载详情中...</div>
-
+        <div v-if="store.state.detailLoading" class="detail-loading">加载中...</div>
         <template v-else-if="store.state.selectedPost">
           <span class="eyebrow">Post Detail</span>
           <h3 class="detail-title">{{ store.state.selectedPost.title }}</h3>
-
           <div class="detail-meta">
-            <span class="avatar-circle large">{{ getInitial(store.state.selectedPost.author) }}</span>
+            <span class="avatar-circle">{{ getInitial(store.state.selectedPost.author) }}</span>
             <div>
               <strong>{{ store.state.selectedPost.author }}</strong>
               <span>{{ store.state.selectedPost.institution || '学术难民' }}</span>
             </div>
             <time>{{ formatLongDate(store.state.selectedPost.createdAt) }}</time>
           </div>
-
           <div class="post-tags">
             <span v-for="tag in store.state.selectedPost.tags || []" :key="tag" class="post-tag">#{{ tag }}</span>
           </div>
-
           <div class="detail-body">{{ store.state.selectedPost.content }}</div>
-
           <div class="detail-stats">
             <span><AppIcon name="message-circle" /> {{ formatNumber(store.state.selectedPost.comments || 0) }}</span>
             <span><AppIcon name="star" /> {{ formatNumber(store.state.selectedPost.stars || 0) }}</span>
             <span><AppIcon name="eye" /> {{ formatNumber(store.state.selectedPost.views || 0) }}</span>
           </div>
-
           <div class="modal-actions">
             <button class="ghost-button" @click="store.toggleFavorite(store.state.selectedPost.id)">
-              <AppIcon :name="isFavorite ? 'bookmark-check' : 'bookmark'" />
-              <span>{{ isFavorite ? '已收藏' : '加入收藏' }}</span>
+              {{ isFavorite ? '已收藏' : '加入收藏' }}
             </button>
             <button class="primary-button" @click="copyLink">
-              <AppIcon name="share-2" />
-              <span>{{ linkCopied ? '已复制' : '复制链接' }}</span>
+              {{ linkCopied ? '已复制' : '复制链接' }}
             </button>
           </div>
         </template>
