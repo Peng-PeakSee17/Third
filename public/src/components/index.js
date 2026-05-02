@@ -528,6 +528,15 @@ export const AuthModal = {
     const usernameHasChinese = computed(() => /[\u4e00-\u9fff]/.test(form.username));
     let countdownTimer = null;
 
+    // Reset password state
+    const resetStep = ref('email');
+    const resetEmail = ref('');
+    const resetCode = ref('');
+    const resetNewPassword = ref('');
+    const resetCountdown = ref(0);
+    const resetSuccess = ref(false);
+    let resetCountdownTimer = null;
+
     function startCountdown() {
       resendCountdown.value = 60;
       clearInterval(countdownTimer);
@@ -542,6 +551,7 @@ export const AuthModal = {
 
     onUnmounted(() => {
       clearInterval(countdownTimer);
+      clearInterval(resetCountdownTimer);
     });
 
     let cachedUniversityList = null;
@@ -719,7 +729,92 @@ export const AuthModal = {
       }
     }
 
-    return { store, form, error, registerStep, registerSuccess, verificationCode, resendCountdown, universitySuggestions, showPassword, showConfirmPassword, usernameHasChinese, submit, verifyCode, resendCode, filterUniversities, selectUniversity, onInstitutionBlur };
+    // --- Reset password methods ---
+    function goToReset() {
+      store.state.authMode = 'reset';
+      resetStep.value = 'email';
+      resetEmail.value = '';
+      resetCode.value = '';
+      resetNewPassword.value = '';
+      resetSuccess.value = false;
+      error.message = '';
+      resetCountdown.value = 0;
+      clearInterval(resetCountdownTimer);
+    }
+
+    function startResetCountdown() {
+      resetCountdown.value = 60;
+      clearInterval(resetCountdownTimer);
+      resetCountdownTimer = setInterval(() => {
+        resetCountdown.value--;
+        if (resetCountdown.value <= 0) {
+          clearInterval(resetCountdownTimer);
+          resetCountdownTimer = null;
+        }
+      }, 1000);
+    }
+
+    async function submitResetEmail() {
+      error.message = '';
+      if (!resetEmail.value.trim()) {
+        error.message = '邮箱不能为空';
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail.value.trim())) {
+        error.message = '邮箱格式不正确';
+        return;
+      }
+      try {
+        await store.sendResetCode({ email: resetEmail.value.trim() });
+        resetStep.value = 'code';
+        startResetCountdown();
+      } catch (err) {
+        error.message = err.message;
+      }
+    }
+
+    async function submitResetPassword() {
+      error.message = '';
+      if (!resetCode.value.trim()) {
+        error.message = '请输入验证码';
+        return;
+      }
+      if (!resetNewPassword.value) {
+        error.message = '请输入新密码';
+        return;
+      }
+      try {
+        await store.resetPassword({
+          email: resetEmail.value.trim(),
+          code: resetCode.value.trim(),
+          newPassword: resetNewPassword.value
+        });
+        resetSuccess.value = true;
+        resetCode.value = '';
+        resetNewPassword.value = '';
+        setTimeout(() => {
+          resetSuccess.value = false;
+          store.state.authMode = 'login';
+          form.email = resetEmail.value.trim();
+          form.password = '';
+        }, 2500);
+      } catch (err) {
+        error.message = err.message;
+      }
+    }
+
+    async function resendResetCode() {
+      if (resetCountdown.value > 0) return;
+      error.message = '';
+      try {
+        await store.sendResetCode({ email: resetEmail.value.trim() });
+        startResetCountdown();
+      } catch (err) {
+        error.message = err.message;
+      }
+    }
+
+    return { store, form, error, registerStep, registerSuccess, verificationCode, resendCountdown, universitySuggestions, showPassword, showConfirmPassword, usernameHasChinese, resetStep, resetEmail, resetCode, resetNewPassword, resetCountdown, resetSuccess, submit, verifyCode, resendCode, filterUniversities, selectUniversity, onInstitutionBlur, goToReset, submitResetEmail, submitResetPassword, resendResetCode };
   },
   template: `
     <div v-if="store.state.showAuthModal" class="auth-overlay">
@@ -761,6 +856,53 @@ export const AuthModal = {
                 {{ store.state.authSubmitting ? '验证中...' : '完成注册' }}
               </button>
             </div>
+          </template>
+          <template v-else-if="store.state.authMode === 'reset'">
+            <template v-if="resetSuccess">
+              <div class="auth-success">
+                <div class="auth-success-icon"><AppIcon name="check-circle" /></div>
+                <h3>密码已重置</h3>
+                <p>请使用新密码登录</p>
+              </div>
+            </template>
+            <template v-else-if="resetStep === 'email'">
+              <div class="auth-form-head">
+                <h3>找回密码</h3>
+                <p>输入注册时使用的邮箱，我们将发送验证码</p>
+              </div>
+              <label class="auth-field">
+                <span class="auth-field-label">邮箱</span>
+                <input v-model="resetEmail" type="email" class="auth-field-input" placeholder="输入你的注册邮箱">
+              </label>
+              <span v-if="error.message" class="auth-error">{{ error.message }}</span>
+              <button class="auth-btn-primary auth-btn-block" :disabled="store.state.authSubmitting" @click="submitResetEmail">
+                {{ store.state.authSubmitting ? '发送中...' : '发送验证码' }}
+              </button>
+              <button class="auth-forgot-link" @click="store.state.authMode = 'login'">返回登录</button>
+            </template>
+            <template v-else-if="resetStep === 'code'">
+              <div class="auth-form-head">
+                <h3>输入验证码</h3>
+                <p>已发送到 <strong>{{ resetEmail }}</strong></p>
+              </div>
+              <label class="auth-field">
+                <span class="auth-field-label">验证码</span>
+                <input v-model="resetCode" type="text" class="auth-field-input auth-code-input" placeholder="输入6位验证码" maxlength="6">
+              </label>
+              <label class="auth-field">
+                <span class="auth-field-label">新密码</span>
+                <input v-model="resetNewPassword" type="password" class="auth-field-input" placeholder="设置新密码">
+              </label>
+              <span v-if="error.message" class="auth-error">{{ error.message }}</span>
+              <div class="auth-btn-row">
+                <button class="auth-btn-ghost" :disabled="resetCountdown > 0" @click="resendResetCode">
+                  {{ resetCountdown > 0 ? resetCountdown + 's 后重发' : '重新发送' }}
+                </button>
+                <button class="auth-btn-primary" :disabled="store.state.authSubmitting" @click="submitResetPassword">
+                  {{ store.state.authSubmitting ? '重置中...' : '重置密码' }}
+                </button>
+              </div>
+            </template>
           </template>
           <template v-else>
             <div class="auth-tabs">
@@ -811,6 +953,7 @@ export const AuthModal = {
             <button class="auth-btn-primary auth-btn-block" :disabled="store.state.authSubmitting" @click="submit">
               {{ store.state.authSubmitting ? '提交中...' : (store.state.authMode === 'register' ? '发送验证码' : '登录') }}
             </button>
+            <button v-if="store.state.authMode === 'login'" class="auth-forgot-link" @click="goToReset">忘记密码？</button>
           </template>
         </div>
       </div>
@@ -1113,8 +1256,9 @@ export const PostDetailModal = {
             <span><AppIcon name="eye" /> {{ formatNumber(store.state.selectedPost.views || 0) }}</span>
           </div>
           <div class="modal-actions">
-            <button class="ghost-button" @click="store.toggleFavorite(store.state.selectedPost.id)">
-              {{ isFavorite ? '已收藏' : '加入收藏' }}
+            <button class="ghost-button" :class="{ favorited: isFavorite }" @click="store.toggleFavorite(store.state.selectedPost.id)">
+              <AppIcon :name="isFavorite ? 'bookmark-check' : 'bookmark'" />
+              <span>{{ isFavorite ? '已收藏' : '收藏' }}</span>
             </button>
             <button class="primary-button" @click="copyLink">
               {{ linkCopied ? '已复制' : '复制链接' }}

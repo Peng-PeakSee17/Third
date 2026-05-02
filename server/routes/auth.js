@@ -115,6 +115,78 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// POST /auth/send-reset-code
+router.post('/send-reset-code', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: '邮箱必填' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: '邮箱格式不正确' });
+  }
+
+  try {
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (!user) {
+      return res.status(404).json({ error: '该邮箱未注册' });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    storeCode(email, code, { userId: user.id });
+
+    await resend.emails.send({
+      from: 'Third <noreply@pengpalm.cn>',
+      to: email,
+      subject: 'Third 密码重置验证码',
+      html: `<p>你的密码重置验证码是：<strong style="font-size:24px;letter-spacing:4px">${code}</strong></p><p>5 分钟内有效。</p>`
+    });
+
+    res.json({ message: '验证码已发送' });
+  } catch (err) {
+    console.error('发送重置验证码错误:', err);
+    res.status(500).json({ error: '发送验证码失败' });
+  }
+});
+
+// POST /auth/reset-password
+router.post('/reset-password', async (req, res) => {
+  const { email, code, newPassword } = req.body;
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({ error: '邮箱、验证码和新密码必填' });
+  }
+
+  try {
+    const payload = verifyCode(email, code);
+    if (!payload) {
+      return res.status(400).json({ error: '验证码无效或已过期' });
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      payload.userId,
+      { password: newPassword }
+    );
+
+    if (updateError) {
+      return res.status(400).json({ error: updateError.message });
+    }
+
+    res.json({ message: '密码重置成功' });
+  } catch (err) {
+    console.error('重置密码错误:', err);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
 // POST /auth/send-code
 router.post('/send-code', async (req, res) => {
   const { username, email, password, institution } = req.body;

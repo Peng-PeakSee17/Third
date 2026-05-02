@@ -233,6 +233,32 @@ export function createAppStore(router) {
     }
   }
 
+  async function sendResetCode(payload) {
+    state.authSubmitting = true;
+    try {
+      await request(`${API}/auth/send-reset-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } finally {
+      state.authSubmitting = false;
+    }
+  }
+
+  async function resetPassword(payload) {
+    state.authSubmitting = true;
+    try {
+      await request(`${API}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } finally {
+      state.authSubmitting = false;
+    }
+  }
+
   async function sendVerificationCode(payload) {
     state.authSubmitting = true;
     try {
@@ -432,6 +458,8 @@ export function createAppStore(router) {
     openAuthModal,
     closeAuthModal,
     submitAuth,
+    sendResetCode,
+    resetPassword,
     sendVerificationCode,
     verifyAndRegister,
     logout,
