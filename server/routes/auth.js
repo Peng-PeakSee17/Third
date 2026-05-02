@@ -77,10 +77,35 @@ router.post('/login', async (req, res) => {
 
   try {
     // Supabase Auth: 登录
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password: password,
     });
+
+    // 如果因邮箱未确认失败，用 admin 主动确认后重试
+    if (authError && authError.message.includes('Email not confirmed') && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.log('[login] Email not confirmed, auto-confirming:', email);
+      const { data: userInfo } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (userInfo) {
+        const supabaseAdmin = createClient(
+          process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+        const { error: confirmErr } = await supabaseAdmin.auth.admin.updateUserById(
+          userInfo.id, { email_confirm: true }
+        );
+        if (!confirmErr) {
+          const retry = await supabase.auth.signInWithPassword({ email, password });
+          authData = retry.data;
+          authError = retry.error;
+        }
+      }
+    }
 
     if (authError) {
       console.error('[login] Supabase signIn error:', authError.message, 'email:', email);
@@ -186,7 +211,11 @@ router.post('/reset-password', async (req, res) => {
       { password: newPassword, email_confirm: true }
     );
 
-    console.log('[reset-password] updateData:', JSON.stringify({ id: updateData?.user?.id, email: updateData?.user?.email }));
+    console.log('[reset-password] updateData:', JSON.stringify({
+      id: updateData?.user?.id,
+      email: updateData?.user?.email,
+      email_confirmed_at: updateData?.user?.email_confirmed_at
+    }));
     console.log('[reset-password] updateError:', updateError);
 
     if (updateError) {
