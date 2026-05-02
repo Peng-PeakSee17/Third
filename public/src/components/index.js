@@ -1177,8 +1177,7 @@ export const PublishModal = {
           <div class="form-field">
             <span>论文文件</span>
             <div
-              :class="['file-drop-zone', { 'file-drop-zone-error': fileError }]"
-              :class="{ 'has-file': selectedFile, 'drag-over': isDragOver }"
+              :class="['file-drop-zone', { 'has-file': selectedFile, 'drag-over': isDragOver, 'file-drop-zone-error': fileError }]"
               @click="$refs.fileInput.click()"
               @dragover.prevent="isDragOver = true"
               @dragleave.prevent="isDragOver = false"
