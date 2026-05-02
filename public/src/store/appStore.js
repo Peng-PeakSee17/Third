@@ -435,7 +435,7 @@ export function createAppStore(router) {
     }
     state.publishSubmitting = true;
     try {
-      await request(`${API}/upload`, {
+      const data = await request(`${API}/upload`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -446,7 +446,9 @@ export function createAppStore(router) {
       closePublishModal();
       state.activeFeed = 'latest';
       await Promise.all([refreshAll(), fetchMyPapers()]);
-      if (router.currentRoute.value.name !== 'home') {
+      if (data?.paper?.id) {
+        router.push({ name: 'paper', params: { id: data.paper.id } });
+      } else if (router.currentRoute.value.name !== 'home') {
         router.push({ name: 'home' });
       }
     } finally {

@@ -247,7 +247,11 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       }
     }
 
-    const { error } = await supabase
+    const supabaseAdmin = createClient(
+      process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+    const { error } = await supabaseAdmin
       .from('papers')
       .delete()
       .eq('id', id);

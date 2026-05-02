@@ -1978,7 +1978,7 @@ img {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 999px;
 }
 
@@ -2796,7 +2796,8 @@ img {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--bg-soft);
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
   min-height: 500px;
 }
 
@@ -2872,6 +2873,8 @@ img {
   line-height: 1.85;
   color: var(--text);
   max-width: 100%;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
   overflow-wrap: break-word;
 }
 
