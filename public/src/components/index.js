@@ -533,7 +533,10 @@ export const AuthModal = {
     const resetEmail = ref('');
     const resetCode = ref('');
     const resetNewPassword = ref('');
+    const resetConfirmPassword = ref('');
     const resetCountdown = ref(0);
+    const showResetPassword = ref(false);
+    const showResetConfirmPassword = ref(false);
     const resetSuccess = ref(false);
     let resetCountdownTimer = null;
 
@@ -783,6 +786,10 @@ export const AuthModal = {
         error.message = '请输入新密码';
         return;
       }
+      if (resetNewPassword.value !== resetConfirmPassword.value) {
+        error.message = '两次密码不一致';
+        return;
+      }
       try {
         await store.resetPassword({
           email: resetEmail.value.trim(),
@@ -792,6 +799,7 @@ export const AuthModal = {
         resetSuccess.value = true;
         resetCode.value = '';
         resetNewPassword.value = '';
+        resetConfirmPassword.value = '';
         setTimeout(() => {
           resetSuccess.value = false;
           store.state.authMode = 'login';
@@ -814,7 +822,7 @@ export const AuthModal = {
       }
     }
 
-    return { store, form, error, registerStep, registerSuccess, verificationCode, resendCountdown, universitySuggestions, showPassword, showConfirmPassword, usernameHasChinese, resetStep, resetEmail, resetCode, resetNewPassword, resetCountdown, resetSuccess, submit, verifyCode, resendCode, filterUniversities, selectUniversity, onInstitutionBlur, goToReset, submitResetEmail, submitResetPassword, resendResetCode };
+    return { store, form, error, registerStep, registerSuccess, verificationCode, resendCountdown, universitySuggestions, showPassword, showConfirmPassword, usernameHasChinese, resetStep, resetEmail, resetCode, resetNewPassword, resetConfirmPassword, resetCountdown, resetSuccess, showResetPassword, showResetConfirmPassword, submit, verifyCode, resendCode, filterUniversities, selectUniversity, onInstitutionBlur, goToReset, submitResetEmail, submitResetPassword, resendResetCode };
   },
   template: `
     <div v-if="store.state.showAuthModal" class="auth-overlay">
@@ -891,7 +899,17 @@ export const AuthModal = {
               </label>
               <label class="auth-field">
                 <span class="auth-field-label">新密码</span>
-                <input v-model="resetNewPassword" type="password" class="auth-field-input" placeholder="设置新密码">
+                <div class="auth-field-pw">
+                  <input v-model="resetNewPassword" :type="showResetPassword ? 'text' : 'password'" class="auth-field-input" placeholder="设置新密码" @compositionend="resetNewPassword = resetNewPassword.replace(/[\u4e00-\u9fff]/g, '')" @input="resetNewPassword = resetNewPassword.replace(/[\u4e00-\u9fff]/g, '')">
+                  <button type="button" class="auth-pw-toggle" @click="showResetPassword = !showResetPassword"><AppIcon :name="showResetPassword ? 'eye-off' : 'eye'" /></button>
+                </div>
+              </label>
+              <label class="auth-field">
+                <span class="auth-field-label">确认新密码</span>
+                <div class="auth-field-pw">
+                  <input v-model="resetConfirmPassword" :type="showResetConfirmPassword ? 'text' : 'password'" class="auth-field-input" placeholder="再次输入新密码" @compositionend="resetConfirmPassword = resetConfirmPassword.replace(/[\u4e00-\u9fff]/g, '')" @input="resetConfirmPassword = resetConfirmPassword.replace(/[\u4e00-\u9fff]/g, '')">
+                  <button type="button" class="auth-pw-toggle" @click="showResetConfirmPassword = !showResetConfirmPassword"><AppIcon :name="showResetConfirmPassword ? 'eye-off' : 'eye'" /></button>
+                </div>
               </label>
               <span v-if="error.message" class="auth-error">{{ error.message }}</span>
               <div class="auth-btn-row">
