@@ -11,7 +11,9 @@ const POSTS_KEY = 'third:posts';
 async function getPosts() {
   try {
     const data = await redis.get(POSTS_KEY);
-    return data ? JSON.parse(data) : [];
+    if (Array.isArray(data)) return data;
+    if (typeof data === 'string') return JSON.parse(data);
+    return [];
   } catch (e) {
     console.error('获取帖子失败:', e);
     return [];
