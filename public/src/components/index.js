@@ -1325,6 +1325,18 @@ export const PaperPreview = {
       return idx >= 0 ? name.slice(idx + 1) : name;
     }
 
+    const API = import.meta.env.VITE_API_URL || '/api';
+
+    async function getSignedUrl() {
+      const storagePath = props.fileUrl.replace('/api/files/', '');
+      const resp = await fetch(`${API}/file-url/${storagePath}`, {
+        headers: { Authorization: `Bearer ${store.state.token}` }
+      });
+      if (!resp.ok) throw new Error('获取文件链接失败');
+      const data = await resp.json();
+      return data.signedUrl;
+    }
+
     async function loadFile() {
       if (!props.fileUrl) { loading.value = false; return; }
       loading.value = true;
@@ -1332,35 +1344,25 @@ export const PaperPreview = {
 
       try {
         const ext = getExt(props.fileName);
-        console.log('[PaperPreview] fileUrl:', props.fileUrl, 'ext:', ext);
-        const resp = await fetch(props.fileUrl, {
-          headers: { Authorization: `Bearer ${store.state.token}` }
-        });
-        console.log('[PaperPreview] fetch status:', resp.status, resp.statusText);
-        if (!resp.ok) {
-          const text = await resp.text().catch(() => '');
-          throw new Error(`文件加载失败 (${resp.status}): ${text}`);
-        }
+        const signedUrl = await getSignedUrl();
 
         if (ext === 'pdf') {
-          const blob = await resp.blob();
-          blobUrl.value = URL.createObjectURL(blob);
+          blobUrl.value = signedUrl;
           previewType.value = 'pdf';
         } else if (ext === 'docx') {
+          const resp = await fetch(signedUrl);
+          if (!resp.ok) throw new Error('文件下载失败');
           const buf = await resp.arrayBuffer();
-          console.log('[PaperPreview] arrayBuffer size:', buf.byteLength, 'loading mammoth...');
           await loadMammoth();
-          console.log('[PaperPreview] mammoth loaded, converting...');
           const result = await window.mammoth.convertToHtml({ arrayBuffer: buf });
-          console.log('[PaperPreview] conversion done, html length:', result.value?.length);
           htmlContent.value = result.value;
           previewType.value = 'html';
         } else {
           previewType.value = 'download';
         }
       } catch (e) {
-        console.error('[PaperPreview] ERROR:', e.message);
-        errorMsg.value = '文件预览加载失败: ' + e.message;
+        console.error('[PaperPreview]', e.message);
+        errorMsg.value = '文件预览加载失败';
         previewType.value = 'download';
       } finally {
         loading.value = false;
@@ -1369,9 +1371,8 @@ export const PaperPreview = {
 
     async function downloadFile() {
       try {
-        const resp = await fetch(props.fileUrl, {
-          headers: { Authorization: `Bearer ${store.state.token}` }
-        });
+        const signedUrl = await getSignedUrl();
+        const resp = await fetch(signedUrl);
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

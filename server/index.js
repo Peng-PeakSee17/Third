@@ -113,8 +113,8 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// 文件下载 - 从 Supabase Storage 代理（需 JWT 认证）
-app.get('/api/files/:userId/:filename', async (req, res) => {
+// 获取文件签名 URL（前端直接从 Supabase Storage 下载，不经过 Express 代理）
+app.get('/api/file-url/*', async (req, res) => {
   try {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -126,32 +126,24 @@ app.get('/api/files/:userId/:filename', async (req, res) => {
     return res.status(401).json({ error: 'Token 无效' });
   }
 
-  const storagePath = `${req.params.userId}/${req.params.filename}`;
-  console.log('[file-download] storagePath:', storagePath);
+  const storagePath = req.params[0];
+  if (!storagePath) {
+    return res.status(400).json({ error: '文件路径无效' });
+  }
 
   try {
     const { data, error } = await supabaseAdmin.storage
       .from('papers')
-      .download(storagePath);
+      .createSignedUrl(storagePath, 3600);
 
     if (error || !data) {
       return res.status(404).json({ error: '文件不存在' });
     }
 
-    const buffer = Buffer.from(await data.arrayBuffer());
-    const ext = storagePath.split('.').pop().toLowerCase();
-    const contentTypes = {
-      pdf: 'application/pdf',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      doc: 'application/msword'
-    };
-
-    res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
-    res.setHeader('Content-Length', buffer.length);
-    res.send(buffer);
+    res.json({ signedUrl: data.signedUrl });
   } catch (e) {
-    console.error('File download error:', e);
-    return res.status(500).json({ error: '文件下载失败' });
+    console.error('Signed URL error:', e);
+    res.status(500).json({ error: '获取文件链接失败' });
   }
 });
 

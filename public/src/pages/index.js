@@ -456,13 +456,18 @@ const PaperDetailPage = {
       router.push({ name: 'user' });
     }
 
+    const API = import.meta.env.VITE_API_URL || '/api';
+
     async function handleDownload() {
       const paper = store.state.paperDetail;
       if (!paper?.file_url) return;
       try {
-        const resp = await fetch(paper.file_url, {
+        const storagePath = paper.file_url.replace('/api/files/', '');
+        const urlResp = await fetch(`${API}/file-url/${storagePath}`, {
           headers: { Authorization: `Bearer ${store.state.token}` }
         });
+        const { signedUrl } = await urlResp.json();
+        const resp = await fetch(signedUrl);
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
