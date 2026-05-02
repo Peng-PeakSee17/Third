@@ -83,6 +83,7 @@ router.post('/login', async (req, res) => {
     });
 
     if (authError) {
+      console.error('[login] Supabase signIn error:', authError.message, 'email:', email);
       return res.status(401).json({ error: '邮箱或密码错误' });
     }
 
@@ -173,18 +174,28 @@ router.post('/reset-password', async (req, res) => {
       return res.status(500).json({ error: '服务端未配置 SUPABASE_SERVICE_ROLE_KEY' });
     }
 
+    console.log('[reset-password] userId:', payload.userId, 'email:', normalizedEmail);
+
     const supabaseAdmin = createClient(
       process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+    const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       payload.userId,
       { password: newPassword }
     );
 
+    console.log('[reset-password] updateData:', JSON.stringify({ id: updateData?.user?.id, email: updateData?.user?.email }));
+    console.log('[reset-password] updateError:', updateError);
+
     if (updateError) {
       return res.status(400).json({ error: updateError.message });
+    }
+
+    if (!updateData?.user) {
+      console.error('[reset-password] updateUserById 返回空用户，userId:', payload.userId);
+      return res.status(400).json({ error: '用户不存在，密码未更新' });
     }
 
     res.json({ message: '密码重置成功' });
