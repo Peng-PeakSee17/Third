@@ -1332,10 +1332,15 @@ export const PaperPreview = {
 
       try {
         const ext = getExt(props.fileName);
+        console.log('[PaperPreview] fileUrl:', props.fileUrl, 'ext:', ext);
         const resp = await fetch(props.fileUrl, {
           headers: { Authorization: `Bearer ${store.state.token}` }
         });
-        if (!resp.ok) throw new Error('文件加载失败');
+        console.log('[PaperPreview] fetch status:', resp.status, resp.statusText);
+        if (!resp.ok) {
+          const text = await resp.text().catch(() => '');
+          throw new Error(`文件加载失败 (${resp.status}): ${text}`);
+        }
 
         if (ext === 'pdf') {
           const blob = await resp.blob();
@@ -1343,16 +1348,19 @@ export const PaperPreview = {
           previewType.value = 'pdf';
         } else if (ext === 'docx') {
           const buf = await resp.arrayBuffer();
+          console.log('[PaperPreview] arrayBuffer size:', buf.byteLength, 'loading mammoth...');
           await loadMammoth();
+          console.log('[PaperPreview] mammoth loaded, converting...');
           const result = await window.mammoth.convertToHtml({ arrayBuffer: buf });
+          console.log('[PaperPreview] conversion done, html length:', result.value?.length);
           htmlContent.value = result.value;
           previewType.value = 'html';
         } else {
           previewType.value = 'download';
         }
       } catch (e) {
-        console.error('[PaperPreview]', e);
-        errorMsg.value = '文件预览加载失败';
+        console.error('[PaperPreview] ERROR:', e.message);
+        errorMsg.value = '文件预览加载失败: ' + e.message;
         previewType.value = 'download';
       } finally {
         loading.value = false;

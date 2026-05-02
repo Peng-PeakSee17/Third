@@ -114,7 +114,7 @@ app.post('/api/upload', async (req, res) => {
 });
 
 // 文件下载 - 从 Supabase Storage 代理（需 JWT 认证）
-app.get('/api/files/*', async (req, res) => {
+app.get('/api/files/:userId/:filename', async (req, res) => {
   try {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -126,10 +126,8 @@ app.get('/api/files/*', async (req, res) => {
     return res.status(401).json({ error: 'Token 无效' });
   }
 
-  const storagePath = req.params[0];
-  if (!storagePath) {
-    return res.status(400).json({ error: '文件路径无效' });
-  }
+  const storagePath = `${req.params.userId}/${req.params.filename}`;
+  console.log('[file-download] storagePath:', storagePath);
 
   try {
     const { data, error } = await supabaseAdmin.storage
