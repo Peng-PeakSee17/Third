@@ -1,4 +1,5 @@
-import { computed, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import {
   AppIcon,
   Banner,
@@ -6,6 +7,7 @@ import {
   HeroBanner,
   InsightPanel,
   PostGrid,
+  PaperPreview,
   StatsStrip
 } from '../components/index.js';
 import { useAppStore } from '../store/appStore.js';
@@ -163,6 +165,7 @@ const UserPage = {
   components: { AppIcon, PostGrid },
   setup() {
     const store = useAppStore();
+    const router = useRouter();
 
     watch(
       () => store.isLoggedIn,
@@ -185,7 +188,7 @@ const UserPage = {
       return idx >= 0 ? name.slice(idx + 1) : name;
     }
 
-    return { store, getInitial, formatDate, favoritePosts, getFileName };
+    return { store, router, getInitial, formatDate, favoritePosts, getFileName };
   },
   template: `
     <section class="view-shell">
@@ -231,7 +234,7 @@ const UserPage = {
             <div class="loading-card" v-for="item in 3" :key="item"></div>
           </div>
           <div v-else-if="store.state.myPapers.length" class="paper-list">
-            <article v-for="paper in store.state.myPapers" :key="paper.id" class="paper-card">
+            <article v-for="paper in store.state.myPapers" :key="paper.id" class="paper-card clickable" @click="router.push({ name: 'paper', params: { id: paper.id } })">
               <div class="paper-card-icon"><AppIcon name="file-text" /></div>
               <div class="paper-card-content">
                 <h4>{{ paper.title }}</h4>
@@ -249,7 +252,7 @@ const UserPage = {
                   <span v-for="tag in paper.tags.slice(0, 4)" :key="tag" class="post-tag">#{{ tag }}</span>
                 </div>
               </div>
-              <button class="paper-delete-btn" @click="store.deletePaper(paper.id)">
+              <button class="paper-delete-btn" @click.stop="store.deletePaper(paper.id)">
                 <AppIcon name="trash-2" />
               </button>
             </article>
@@ -433,6 +436,134 @@ const SearchPage = {
   `
 };
 
+const PaperDetailPage = {
+  components: { AppIcon, PaperPreview },
+  setup() {
+    const store = useAppStore();
+    const route = useRoute();
+    const router = useRouter();
+
+    function getFileName(url) {
+      if (!url) return '';
+      const name = url.split('/').pop();
+      const idx = name.indexOf('-');
+      return idx >= 0 ? name.slice(idx + 1) : name;
+    }
+
+    async function handleDelete() {
+      if (!store.state.paperDetail) return;
+      await store.deletePaper(store.state.paperDetail.id);
+      router.push({ name: 'user' });
+    }
+
+    async function handleDownload() {
+      const paper = store.state.paperDetail;
+      if (!paper?.file_url) return;
+      try {
+        const resp = await fetch(paper.file_url, {
+          headers: { Authorization: `Bearer ${store.state.token}` }
+        });
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = getFileName(paper.file_url) || 'paper';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        window.open(paper.file_url, '_blank');
+      }
+    }
+
+    onMounted(() => {
+      store.fetchPaperDetail(route.params.id);
+    });
+
+    watch(() => route.params.id, (newId) => {
+      if (newId) store.fetchPaperDetail(newId);
+    });
+
+    return { store, getFileName, handleDelete, handleDownload, getInitial, formatDate };
+  },
+  template: `
+    <section class="view-shell">
+      <div v-if="store.state.loadingPaperDetail" class="paper-detail-loading">
+        <div class="paper-preview-spinner"></div>
+        <span>加载中...</span>
+      </div>
+      <div v-else-if="store.state.paperDetail" class="paper-detail">
+        <header class="paper-detail-header">
+          <button class="ghost-button" @click="$router.back()">
+            <AppIcon name="arrow-left" /> 返回
+          </button>
+          <div class="paper-detail-header-actions">
+            <button v-if="store.state.paperDetail.file_url" class="ghost-button" @click="handleDownload">
+              <AppIcon name="download" /> 下载
+            </button>
+            <button
+              v-if="store.state.paperDetail.user_id === store.state.currentUser?.id"
+              class="ghost-button danger"
+              @click="handleDelete"
+            >
+              <AppIcon name="trash-2" /> 删除
+            </button>
+          </div>
+        </header>
+
+        <div class="paper-detail-body">
+          <aside class="paper-detail-sidebar">
+            <h1 class="paper-detail-title">{{ store.state.paperDetail.title }}</h1>
+
+            <div class="paper-detail-author">
+              <span class="mini-avatar">{{ getInitial(store.state.paperDetail.institution?.charAt(0) || 'A') }}</span>
+              <div>
+                <strong>{{ store.state.paperDetail.institution || '匿名学术难民' }}</strong>
+                <span>{{ formatDate(store.state.paperDetail.created_at) }}</span>
+              </div>
+            </div>
+
+            <p v-if="store.state.paperDetail.description" class="paper-detail-desc">
+              {{ store.state.paperDetail.description }}
+            </p>
+
+            <div v-if="store.state.paperDetail.tags?.length" class="post-tags">
+              <span v-for="tag in store.state.paperDetail.tags" :key="tag" class="post-tag">#{{ tag }}</span>
+            </div>
+
+            <div class="paper-detail-stats">
+              <span><AppIcon name="eye" /> {{ store.state.paperDetail.views || 0 }}</span>
+              <span><AppIcon name="star" /> {{ store.state.paperDetail.stars || 0 }}</span>
+            </div>
+
+            <div v-if="store.state.paperDetail.file_url" class="paper-detail-file-badge">
+              <AppIcon name="paperclip" />
+              <span>{{ getFileName(store.state.paperDetail.file_url) }}</span>
+            </div>
+          </aside>
+
+          <main class="paper-detail-preview">
+            <PaperPreview
+              v-if="store.state.paperDetail.file_url"
+              :file-url="store.state.paperDetail.file_url"
+              :file-name="getFileName(store.state.paperDetail.file_url)"
+            />
+            <div v-else class="paper-preview-unsupported">
+              <AppIcon name="file-text" />
+              <p>该论文没有附件</p>
+            </div>
+          </main>
+        </div>
+      </div>
+      <div v-else class="empty-card">
+        <strong>论文不存在或已被删除</strong>
+        <button class="ghost-button" @click="$router.push({ name: 'user' })">返回个人页</button>
+      </div>
+    </section>
+  `
+};
+
 export const routes = [
   { path: '/', name: 'home', component: HomePage },
   { path: '/news', name: 'news', component: NewsPage },
@@ -440,6 +571,7 @@ export const routes = [
   { path: '/submit', name: 'submit', component: SubmitPage },
   { path: '/trending', name: 'trending', component: TrendingPage },
   { path: '/user', name: 'user', component: UserPage },
+  { path: '/paper/:id', name: 'paper', component: PaperDetailPage },
   { path: '/discover', name: 'discover', component: DiscoverPage },
   { path: '/recycle', name: 'recycle', component: RecyclePage },
   { path: '/search', name: 'search', component: SearchPage }

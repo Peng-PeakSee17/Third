@@ -34,6 +34,8 @@ export function createAppStore(router) {
     detailLoading: false,
     myPapers: [],
     loadingMyPapers: false,
+    paperDetail: null,
+    loadingPaperDetail: false,
     userTab: 'papers'
   });
 
@@ -403,6 +405,21 @@ export function createAppStore(router) {
     }
   }
 
+  async function fetchPaperDetail(paperId) {
+    state.loadingPaperDetail = true;
+    state.paperDetail = null;
+    try {
+      const data = await request(`${API}/papers/${paperId}`, {
+        headers: { Authorization: `Bearer ${state.token}` }
+      });
+      state.paperDetail = data.paper || null;
+    } catch {
+      state.paperDetail = null;
+    } finally {
+      state.loadingPaperDetail = false;
+    }
+  }
+
   async function deletePaper(paperId) {
     await request(`${API}/papers/${paperId}`, {
       method: 'DELETE',
@@ -471,6 +488,7 @@ export function createAppStore(router) {
     toggleFavorite,
     myPosts,
     fetchMyPapers,
+    fetchPaperDetail,
     deletePaper,
     publishPaper,
     setUserTab

@@ -1287,3 +1287,132 @@ export const PostDetailModal = {
     </div>
   `
 };
+
+function loadMammoth() {
+  return new Promise((resolve, reject) => {
+    if (window.mammoth) return resolve(window.mammoth);
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
+    script.onload = () => resolve(window.mammoth);
+    script.onerror = () => reject(new Error('mammoth.js 加载失败'));
+    document.head.appendChild(script);
+  });
+}
+
+export const PaperPreview = {
+  components: { AppIcon },
+  props: {
+    fileUrl: { type: String, default: '' },
+    fileName: { type: String, default: '' }
+  },
+  setup(props) {
+    const store = useAppStore();
+    const loading = ref(true);
+    const errorMsg = ref('');
+    const previewType = ref('');
+    const blobUrl = ref('');
+    const htmlContent = ref('');
+
+    function getExt(name) {
+      if (!name) return '';
+      return name.split('.').pop().toLowerCase();
+    }
+
+    function extractName(url) {
+      if (!url) return '';
+      const name = url.split('/').pop();
+      const idx = name.indexOf('-');
+      return idx >= 0 ? name.slice(idx + 1) : name;
+    }
+
+    async function loadFile() {
+      if (!props.fileUrl) { loading.value = false; return; }
+      loading.value = true;
+      errorMsg.value = '';
+
+      try {
+        const ext = getExt(props.fileName);
+        const resp = await fetch(props.fileUrl, {
+          headers: { Authorization: `Bearer ${store.state.token}` }
+        });
+        if (!resp.ok) throw new Error('文件加载失败');
+
+        if (ext === 'pdf') {
+          const blob = await resp.blob();
+          blobUrl.value = URL.createObjectURL(blob);
+          previewType.value = 'pdf';
+        } else if (ext === 'docx') {
+          const buf = await resp.arrayBuffer();
+          await loadMammoth();
+          const result = await window.mammoth.convertToHtml({ arrayBuffer: buf });
+          htmlContent.value = result.value;
+          previewType.value = 'html';
+        } else {
+          previewType.value = 'download';
+        }
+      } catch (e) {
+        console.error('[PaperPreview]', e);
+        errorMsg.value = '文件预览加载失败';
+        previewType.value = 'download';
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    async function downloadFile() {
+      try {
+        const resp = await fetch(props.fileUrl, {
+          headers: { Authorization: `Bearer ${store.state.token}` }
+        });
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = extractName(props.fileUrl) || 'paper';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        window.open(props.fileUrl, '_blank');
+      }
+    }
+
+    onMounted(loadFile);
+    onUnmounted(() => {
+      if (blobUrl.value) URL.revokeObjectURL(blobUrl.value);
+    });
+
+    return { loading, errorMsg, previewType, blobUrl, htmlContent, downloadFile, extractName };
+  },
+  template: `
+    <div class="paper-preview">
+      <div v-if="loading" class="paper-preview-loading">
+        <div class="paper-preview-spinner"></div>
+        <span>文件加载中...</span>
+      </div>
+      <div v-else-if="errorMsg && previewType === 'download'" class="paper-preview-unsupported">
+        <AppIcon name="file-text" />
+        <p>{{ errorMsg }}</p>
+        <p class="paper-preview-filename">{{ extractName(fileUrl) }}</p>
+        <button class="primary-button" @click="downloadFile">
+          <AppIcon name="download" /> 下载文件
+        </button>
+      </div>
+      <div v-else-if="previewType === 'download'" class="paper-preview-unsupported">
+        <AppIcon name="file-text" />
+        <p>该文件格式不支持在线预览</p>
+        <p class="paper-preview-filename">{{ extractName(fileUrl) }}</p>
+        <button class="primary-button" @click="downloadFile">
+          <AppIcon name="download" /> 下载查看
+        </button>
+      </div>
+      <iframe
+        v-else-if="previewType === 'pdf'"
+        :src="blobUrl"
+        class="paper-preview-iframe"
+      ></iframe>
+      <div v-else-if="previewType === 'html'" class="paper-preview-html" v-html="htmlContent"></div>
+    </div>
+  `
+};
