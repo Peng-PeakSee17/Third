@@ -81,7 +81,7 @@ app.post('/api/upload', async (req, res) => {
       .eq('id', userId)
       .single();
 
-    const { data: paper, error: paperError } = await supabase
+    const { data: paper, error: paperError } = await supabaseAdmin
       .from('papers')
       .insert([
         {
