@@ -183,7 +183,7 @@ router.post('/reset-password', async (req, res) => {
 
     const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       payload.userId,
-      { password: newPassword }
+      { password: newPassword, email_confirm: true }
     );
 
     console.log('[reset-password] updateData:', JSON.stringify({ id: updateData?.user?.id, email: updateData?.user?.email }));
@@ -290,6 +290,15 @@ router.post('/verify-register', async (req, res) => {
         return res.status(409).json({ error: '用户名已存在' });
       }
       return res.status(400).json({ error: authError.message });
+    }
+
+    // 用 service_role key 确认邮箱（用户已通过验证码验证）
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const supabaseAdmin = createClient(
+        process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
+      await supabaseAdmin.auth.admin.updateUserById(authData.user.id, { email_confirm: true });
     }
 
     // 创建用户信息
