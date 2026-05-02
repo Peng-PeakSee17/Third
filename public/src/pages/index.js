@@ -252,7 +252,7 @@ const UserPage = {
                   <span v-for="tag in paper.tags.slice(0, 4)" :key="tag" class="post-tag">#{{ tag }}</span>
                 </div>
               </div>
-              <button class="paper-delete-btn" @click.stop="store.deletePaper(paper.id)">
+              <button class="paper-delete-btn" @click.stop="store.requestDelete(paper.id)">
                 <AppIcon name="trash-2" />
               </button>
             </article>
@@ -450,10 +450,9 @@ const PaperDetailPage = {
       return idx >= 0 ? name.slice(idx + 1) : name;
     }
 
-    async function handleDelete() {
+    function handleDelete() {
       if (!store.state.paperDetail) return;
-      await store.deletePaper(store.state.paperDetail.id);
-      router.push({ name: 'user' });
+      store.requestDelete(store.state.paperDetail.id);
     }
 
     const API = import.meta.env.VITE_API_URL || '/api';

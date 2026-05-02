@@ -1425,3 +1425,48 @@ export const PaperPreview = {
     </div>
   `
 };
+
+export const DeleteConfirmModal = {
+  components: { AppIcon },
+  setup() {
+    const store = useAppStore();
+    const deleting = ref(false);
+
+    async function confirmDelete() {
+      deleting.value = true;
+      try {
+        await store.deletePaper(store.state.pendingDeleteId);
+      } catch {
+        // deletePaper already sets deleteError
+      } finally {
+        deleting.value = false;
+      }
+    }
+
+    function closeOnMask(event) {
+      if (event.target === event.currentTarget) {
+        store.cancelDelete();
+      }
+    }
+
+    return { store, deleting, confirmDelete, closeOnMask };
+  },
+  template: `
+    <div v-if="store.state.showDeleteConfirm" class="modal-mask" @click="closeOnMask">
+      <div class="modal-panel" style="max-width: 400px; text-align: center;">
+        <h3>确认删除</h3>
+        <p style="color: var(--text-secondary); margin: 12px 0 20px;">删除后将无法恢复，确定要删除这篇论文吗？</p>
+        <p v-if="store.state.deleteError" style="color: #ef4444; margin-bottom: 12px; font-size: 14px;">{{ store.state.deleteError }}</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button class="ghost-button" @click="store.cancelDelete()">取消</button>
+          <button
+            class="primary-button"
+            style="background: #ef4444;"
+            :disabled="deleting"
+            @click="confirmDelete"
+          >{{ deleting ? '删除中...' : '确认删除' }}</button>
+        </div>
+      </div>
+    </div>
+  `
+};

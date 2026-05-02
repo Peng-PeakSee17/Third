@@ -10,6 +10,11 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3B5bmVhZmdocXlraWNpeXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjczNzEsImV4cCI6MjA5MTUwMzM3MX0.zTPkPVOzK-MtgaMAkdKS6gnKiI9OLJEMe0j1oUqRssw'
 );
 
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
 const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
 
 // 统一认证中间件
@@ -225,6 +230,8 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       .eq('id', id)
       .single();
 
+    console.log(`[DELETE] Ownership check for paper ${id} - found: ${!!existing}${existing ? `, owner: ${existing.user_id}, requester: ${req.user.id}` : ''}`);
+
     if (!existing) {
       return res.status(404).json({ error: '论文不存在' });
     }
@@ -237,33 +244,34 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     if (existing.file_url) {
       const storagePath = existing.file_url.replace('/api/files/', '');
       try {
-        const supabaseAdmin = createClient(
-          process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
-          process.env.SUPABASE_SERVICE_ROLE_KEY
-        );
         await supabaseAdmin.storage.from('papers').remove([storagePath]);
+        console.log(`[DELETE] Storage file removed: ${storagePath}`);
       } catch (fileErr) {
-        console.error('删除文件失败:', fileErr);
+        console.error('[DELETE] 删除文件失败:', fileErr);
       }
     }
 
-    const supabaseAdmin = createClient(
-      process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-    const { error } = await supabaseAdmin
+    console.log(`[DELETE] Removing paper record: ${id}`);
+    const { data: deletedRows, error } = await supabaseAdmin
       .from('papers')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select('id');
 
     if (error) {
-      console.error('删除论文失败:', error);
+      console.error('[DELETE] 删除论文失败:', error);
       return res.status(500).json({ error: '删除论文失败' });
     }
 
-    return res.status(200).json({ success: true });
+    if (!deletedRows || deletedRows.length === 0) {
+      console.warn(`[DELETE] No rows deleted for paper ${id} — record may have already been removed`);
+    } else {
+      console.log(`[DELETE] Paper ${id} deleted successfully`);
+    }
+
+    return res.status(200).json({ success: true, deletedId: id });
   } catch (e) {
-    console.error('删除论文错误:', e);
+    console.error('[DELETE] 删除论文错误:', e);
     return res.status(500).json({ error: '服务器内部错误' });
   }
 });

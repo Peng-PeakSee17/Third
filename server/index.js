@@ -100,12 +100,11 @@ app.post('/api/upload', async (req, res) => {
       .single();
 
     if (paperError) {
-      return res.status(200).json({
-        fileUrl,
-        warning: '文件已上传，但创建论文记录失败'
-      });
+      console.error('[UPLOAD] Paper INSERT failed:', paperError);
+      return res.status(500).json({ error: '论文记录创建失败' });
     }
 
+    console.log(`[UPLOAD] Paper created: ${paper.id} by user ${userId}`);
     return res.status(200).json({ paper });
   } catch (e) {
     console.error('上传错误:', e);

@@ -11,6 +11,7 @@ import {
 import {
   AppHeader,
   AuthModal,
+  DeleteConfirmModal,
   PostDetailModal,
   PublishModal
 } from './components/index.js';
@@ -31,6 +32,7 @@ const App = {
     AuthModal,
     PublishModal,
     PostDetailModal,
+    DeleteConfirmModal,
     RouterView
   },
   setup() {
@@ -69,6 +71,7 @@ const App = {
       <AuthModal />
       <PublishModal />
       <PostDetailModal />
+      <DeleteConfirmModal />
     </div>
   `
 };

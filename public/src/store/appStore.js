@@ -36,7 +36,10 @@ export function createAppStore(router) {
     loadingMyPapers: false,
     paperDetail: null,
     loadingPaperDetail: false,
-    userTab: 'papers'
+    userTab: 'papers',
+    showDeleteConfirm: false,
+    pendingDeleteId: null,
+    deleteError: ''
   });
 
   const isLoggedIn = computed(() => Boolean(state.token && state.currentUser));
@@ -390,19 +393,26 @@ export function createAppStore(router) {
     }
   }
 
+  let fetchMyPapersPromise = null;
+
   async function fetchMyPapers() {
     if (!isLoggedIn.value) return;
-    state.loadingMyPapers = true;
-    try {
-      const data = await request(`${API}/papers?author=me`, {
-        headers: { Authorization: `Bearer ${state.token}` }
-      });
-      state.myPapers = data.papers || [];
-    } catch {
-      state.myPapers = [];
-    } finally {
-      state.loadingMyPapers = false;
-    }
+    if (fetchMyPapersPromise) return fetchMyPapersPromise;
+    fetchMyPapersPromise = (async () => {
+      state.loadingMyPapers = true;
+      try {
+        const data = await request(`${API}/papers?author=me`, {
+          headers: { Authorization: `Bearer ${state.token}` }
+        });
+        state.myPapers = data.papers || [];
+      } catch (err) {
+        console.error('fetchMyPapers failed:', err.message);
+      } finally {
+        state.loadingMyPapers = false;
+        fetchMyPapersPromise = null;
+      }
+    })();
+    return fetchMyPapersPromise;
   }
 
   async function fetchPaperDetail(paperId) {
@@ -421,11 +431,23 @@ export function createAppStore(router) {
   }
 
   async function deletePaper(paperId) {
-    await request(`${API}/papers/${paperId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${state.token}` }
-    });
+    try {
+      await request(`${API}/papers/${paperId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${state.token}` }
+      });
+    } catch (err) {
+      state.showDeleteConfirm = false;
+      state.deleteError = err.message || '删除失败';
+      throw err;
+    }
+    state.showDeleteConfirm = false;
+    state.pendingDeleteId = null;
+    state.deleteError = '';
     await fetchMyPapers();
+    if (router.currentRoute.value.name === 'paper' && router.currentRoute.value.params.id === paperId) {
+      router.push({ name: 'user' });
+    }
   }
 
   async function publishPaper(payload) {
@@ -460,6 +482,18 @@ export function createAppStore(router) {
     state.userTab = tab;
   }
 
+  function requestDelete(paperId) {
+    state.pendingDeleteId = paperId;
+    state.showDeleteConfirm = true;
+    state.deleteError = '';
+  }
+
+  function cancelDelete() {
+    state.showDeleteConfirm = false;
+    state.pendingDeleteId = null;
+    state.deleteError = '';
+  }
+
   return reactive({
     state,
     isLoggedIn,
@@ -492,6 +526,8 @@ export function createAppStore(router) {
     fetchMyPapers,
     fetchPaperDetail,
     deletePaper,
+    requestDelete,
+    cancelDelete,
     publishPaper,
     setUserTab
   });
