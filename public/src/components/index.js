@@ -1007,8 +1007,10 @@ export const PublishModal = {
     }
 
     function handleFileSelect(event) {
+      fileError.value = '';
       const file = event.target.files[0];
       validateAndSetFile(file);
+      if (fileError.value) event.target.value = '';
     }
 
     function handleFileDrop(event) {
@@ -1175,7 +1177,7 @@ export const PublishModal = {
           <div class="form-field">
             <span>论文文件</span>
             <div
-              class="file-drop-zone"
+              :class="['file-drop-zone', { 'file-drop-zone-error': fileError }]"
               :class="{ 'has-file': selectedFile, 'drag-over': isDragOver }"
               @click="$refs.fileInput.click()"
               @dragover.prevent="isDragOver = true"
@@ -1303,6 +1305,9 @@ function loadMammoth() {
   });
 }
 
+const previewCache = new Map();
+const PREVIEW_CACHE_TTL = 50 * 60 * 1000;
+
 export const PaperPreview = {
   components: { AppIcon },
   props: {
@@ -1343,6 +1348,16 @@ export const PaperPreview = {
 
     async function loadFile() {
       if (!props.fileUrl) { loading.value = false; return; }
+
+      const cached = previewCache.get(props.fileUrl);
+      if (cached && Date.now() - cached.timestamp < PREVIEW_CACHE_TTL) {
+        previewType.value = cached.previewType;
+        blobUrl.value = cached.blobUrl || '';
+        htmlContent.value = cached.htmlContent || '';
+        loading.value = false;
+        return;
+      }
+
       loading.value = true;
       errorMsg.value = '';
 
@@ -1364,6 +1379,13 @@ export const PaperPreview = {
         } else {
           previewType.value = 'download';
         }
+
+        previewCache.set(props.fileUrl, {
+          previewType: previewType.value,
+          blobUrl: blobUrl.value,
+          htmlContent: htmlContent.value,
+          timestamp: Date.now()
+        });
       } catch (e) {
         console.error('[PaperPreview]', e.message);
         errorMsg.value = '文件预览加载失败';
@@ -1393,7 +1415,9 @@ export const PaperPreview = {
 
     onMounted(loadFile);
     onUnmounted(() => {
-      if (blobUrl.value) URL.revokeObjectURL(blobUrl.value);
+      if (blobUrl.value && !previewCache.has(props.fileUrl)) {
+        URL.revokeObjectURL(blobUrl.value);
+      }
     });
 
     return { loading, errorMsg, previewType, blobUrl, htmlContent, downloadFile, extractName };
