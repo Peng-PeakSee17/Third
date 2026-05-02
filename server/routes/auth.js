@@ -118,10 +118,11 @@ router.post('/login', async (req, res) => {
 // POST /auth/send-reset-code
 router.post('/send-reset-code', async (req, res) => {
   const { email } = req.body;
-  if (!email) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  if (!normalizedEmail) {
     return res.status(400).json({ error: '邮箱必填' });
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
     return res.status(400).json({ error: '邮箱格式不正确' });
   }
 
@@ -129,7 +130,7 @@ router.post('/send-reset-code', async (req, res) => {
     const { data: user } = await supabase
       .from('users')
       .select('id')
-      .eq('email', email)
+      .eq('email', normalizedEmail)
       .single();
 
     if (!user) {
@@ -137,11 +138,11 @@ router.post('/send-reset-code', async (req, res) => {
     }
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
-    forceStoreCode(email, code, { userId: user.id });
+    forceStoreCode(normalizedEmail, code, { userId: user.id });
 
     await resend.emails.send({
       from: 'Third <noreply@pengpalm.cn>',
-      to: email,
+      to: normalizedEmail,
       subject: 'Third 密码重置验证码',
       html: `<p>你的密码重置验证码是：<strong style="font-size:24px;letter-spacing:4px">${code}</strong></p><p>5 分钟内有效。</p>`
     });
@@ -156,14 +157,20 @@ router.post('/send-reset-code', async (req, res) => {
 // POST /auth/reset-password
 router.post('/reset-password', async (req, res) => {
   const { email, code, newPassword } = req.body;
-  if (!email || !code || !newPassword) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  if (!normalizedEmail || !code || !newPassword) {
     return res.status(400).json({ error: '邮箱、验证码和新密码必填' });
   }
 
   try {
-    const payload = verifyCode(email, code);
+    const payload = verifyCode(normalizedEmail, code);
     if (!payload) {
       return res.status(400).json({ error: '验证码无效或已过期' });
+    }
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY 未配置');
+      return res.status(500).json({ error: '服务端未配置 SUPABASE_SERVICE_ROLE_KEY' });
     }
 
     const supabaseAdmin = createClient(

@@ -13,12 +13,13 @@ function cleanup() {
 
 function storeCode(email, code, payload) {
   cleanup();
-  const existing = codes.get(email);
+  const key = email.trim().toLowerCase();
+  const existing = codes.get(key);
   if (existing && Date.now() < existing.expiresAt) {
     return false;
   }
-  codes.set(email, {
-    code,
+  codes.set(key, {
+    code: code.trim(),
     payload,
     expiresAt: Date.now() + EXPIRES_MS
   });
@@ -27,8 +28,9 @@ function storeCode(email, code, payload) {
 
 function forceStoreCode(email, code, payload) {
   cleanup();
-  codes.set(email, {
-    code,
+  const key = email.trim().toLowerCase();
+  codes.set(key, {
+    code: code.trim(),
     payload,
     expiresAt: Date.now() + EXPIRES_MS
   });
@@ -36,15 +38,17 @@ function forceStoreCode(email, code, payload) {
 }
 
 function verifyCode(email, code) {
-  const entry = codes.get(email);
+  const key = email.trim().toLowerCase();
+  const inputCode = code.trim();
+  const entry = codes.get(key);
   if (!entry) return null;
   if (Date.now() >= entry.expiresAt) {
-    codes.delete(email);
+    codes.delete(key);
     return null;
   }
-  if (entry.code !== code) return null;
+  if (entry.code !== inputCode) return null;
   const payload = entry.payload;
-  codes.delete(email);
+  codes.delete(key);
   return payload;
 }
 
