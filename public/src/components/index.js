@@ -1029,6 +1029,10 @@ export const PublishModal = {
         fileError.value = '文件大小不能超过 10MB';
         return;
       }
+      if (/[^\x00-\x7F]/.test(file.name)) {
+        fileError.value = '文件名不支持中文或特殊字符，请重命名为英文/数字后再上传';
+        return;
+      }
       selectedFile.value = file;
     }
 
