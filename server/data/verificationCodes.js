@@ -25,6 +25,16 @@ function storeCode(email, code, payload) {
   return true;
 }
 
+function forceStoreCode(email, code, payload) {
+  cleanup();
+  codes.set(email, {
+    code,
+    payload,
+    expiresAt: Date.now() + EXPIRES_MS
+  });
+  return true;
+}
+
 function verifyCode(email, code) {
   const entry = codes.get(email);
   if (!entry) return null;
@@ -38,4 +48,4 @@ function verifyCode(email, code) {
   return payload;
 }
 
-module.exports = { storeCode, verifyCode };
+module.exports = { storeCode, forceStoreCode, verifyCode };

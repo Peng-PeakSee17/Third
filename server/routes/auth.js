@@ -2,7 +2,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const { Resend } = require('resend');
-const { storeCode, verifyCode } = require('../data/verificationCodes');
+const { storeCode, forceStoreCode, verifyCode } = require('../data/verificationCodes');
 
 const router = express.Router();
 
@@ -137,7 +137,7 @@ router.post('/send-reset-code', async (req, res) => {
     }
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
-    storeCode(email, code, { userId: user.id });
+    forceStoreCode(email, code, { userId: user.id });
 
     await resend.emails.send({
       from: 'Third <noreply@pengpalm.cn>',
