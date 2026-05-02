@@ -908,10 +908,20 @@ var e=Object.defineProperty,t=(t,n)=>{let r={};for(var i in t)e(r,i,{get:t[i],en
         />
       </div>
     </section>
-  `}}],V_=u_({history:Ag(),routes:B_}),H_=T_(V_),U_={components:{AppHeader:D_,AuthModal:M_,PublishModal:N_,PostDetailModal:P_,DeleteConfirmModal:z_,RouterView:l_},setup(){return Ir(()=>[H_.state.activeFeed,H_.state.searchQuery],()=>{H_.fetchFeedPosts()}),na(async()=>{await H_.bootstrap(),p_();let e=new URLSearchParams(window.location.search).get(`post`);e&&H_.openPost(e)}),{store:H_}},template:`
+  `}}],V_=u_({history:Ag(),routes:B_}),H_=T_(V_),U_={components:{AppHeader:D_,AuthModal:M_,PublishModal:N_,PostDetailModal:P_,DeleteConfirmModal:z_,RouterView:l_},setup(){let e=[{zh:`站在局外，看清一切`,en:`Stand outside, see everything clearly`},{zh:`不是当事人，但比当事人更清醒`,en:`Not the party involved, but more clear-headed`},{zh:`万物的第三种观点`,en:`The Third View of Everything`},{zh:`不参与，但不缺席`,en:`Not participating, but not absent`}],t=F(0),n=F(!1),r=null;return Ir(()=>[H_.state.activeFeed,H_.state.searchQuery],()=>{H_.fetchFeedPosts()}),na(async()=>{await H_.bootstrap(),p_();let i=new URLSearchParams(window.location.search).get(`post`);i&&H_.openPost(i),r=setInterval(()=>{n.value=!0,setTimeout(()=>{t.value=(t.value+1)%e.length,n.value=!1},600)},5e3)}),oa(()=>{r&&clearInterval(r)}),{store:H_,slogans:e,sloganIndex:t,sloganFading:n}},template:`
     <div class="app-shell">
       <AppHeader />
-      <div class="header-banner"></div>
+      <div class="header-banner">
+        <div class="banner-inner">
+          <span class="slogan-line"></span>
+          <div class="banner-slogan" :class="{ 'slogan-fade': sloganFading }">
+            <p class="slogan-zh">{{ slogans[sloganIndex].zh }}</p>
+            <span class="slogan-en">{{ slogans[sloganIndex].en }}</span>
+          </div>
+          <span class="slogan-line"></span>
+        </div>
+        <div class="slogan-progress" :key="sloganIndex"></div>
+      </div>
       <div class="main-view">
         <RouterView />
       </div>

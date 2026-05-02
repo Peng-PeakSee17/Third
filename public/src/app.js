@@ -1,6 +1,8 @@
 import {
   createApp,
   onMounted,
+  onUnmounted,
+  ref,
   watch
 } from 'vue';
 import {
@@ -36,6 +38,16 @@ const App = {
     RouterView
   },
   setup() {
+    const slogans = [
+      { zh: '站在局外，看清一切', en: 'Stand outside, see everything clearly' },
+      { zh: '不是当事人，但比当事人更清醒', en: 'Not the party involved, but more clear-headed' },
+      { zh: '万物的第三种观点', en: 'The Third View of Everything' },
+      { zh: '不参与，但不缺席', en: 'Not participating, but not absent' }
+    ];
+    const sloganIndex = ref(0);
+    const sloganFading = ref(false);
+    let sloganTimer = null;
+
     watch(
       () => [store.state.activeFeed, store.state.searchQuery],
       () => {
@@ -52,14 +64,36 @@ const App = {
       if (postId) {
         store.openPost(postId);
       }
+
+      sloganTimer = setInterval(() => {
+        sloganFading.value = true;
+        setTimeout(() => {
+          sloganIndex.value = (sloganIndex.value + 1) % slogans.length;
+          sloganFading.value = false;
+        }, 600);
+      }, 5000);
     });
 
-    return { store };
+    onUnmounted(() => {
+      if (sloganTimer) clearInterval(sloganTimer);
+    });
+
+    return { store, slogans, sloganIndex, sloganFading };
   },
   template: `
     <div class="app-shell">
       <AppHeader />
-      <div class="header-banner"></div>
+      <div class="header-banner">
+        <div class="banner-inner">
+          <span class="slogan-line"></span>
+          <div class="banner-slogan" :class="{ 'slogan-fade': sloganFading }">
+            <p class="slogan-zh">{{ slogans[sloganIndex].zh }}</p>
+            <span class="slogan-en">{{ slogans[sloganIndex].en }}</span>
+          </div>
+          <span class="slogan-line"></span>
+        </div>
+        <div class="slogan-progress" :key="sloganIndex"></div>
+      </div>
       <div class="main-view">
         <RouterView />
       </div>
