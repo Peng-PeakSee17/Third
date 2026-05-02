@@ -399,7 +399,10 @@ export function createAppStore(router) {
     if (!isLoggedIn.value) return;
     if (fetchMyPapersPromise) return fetchMyPapersPromise;
     fetchMyPapersPromise = (async () => {
-      state.loadingMyPapers = true;
+      // 只在首次加载（无数据）时显示转圈，有旧数据时后台静默刷新
+      if (!state.myPapers.length) {
+        state.loadingMyPapers = true;
+      }
       try {
         const data = await request(`${API}/papers?author=me`, {
           headers: { Authorization: `Bearer ${state.token}` }

@@ -58,7 +58,7 @@ app.post('/api/upload', async (req, res) => {
     }
 
     const buffer = Buffer.from(fileData, 'base64');
-    const safeName = `${Date.now()}-${(fileName || 'paper').replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const safeName = `${Date.now()}-${(fileName || 'paper').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')}`;
     const storagePath = `${userId}/${safeName}`;
 
     const { error: uploadError } = await supabaseAdmin.storage
