@@ -1,6 +1,5 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
 const path = require('path');
 
 const router = express.Router();
@@ -234,14 +233,15 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: '无权操作此论文' });
     }
 
-    // 删除关联文件
+    // 删除关联文件（从 Supabase Storage）
     if (existing.file_url) {
-      const fileName = existing.file_url.replace('/api/files/', '');
-      const filePath = path.join(__dirname, '..', 'uploads', fileName);
+      const storagePath = existing.file_url.replace('/api/files/', '');
       try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+        const supabaseAdmin = createClient(
+          process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+        await supabaseAdmin.storage.from('papers').remove([storagePath]);
       } catch (fileErr) {
         console.error('删除文件失败:', fileErr);
       }

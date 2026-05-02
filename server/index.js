@@ -2,15 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const path = require('path');
-const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
-
-// 确保上传目录存在
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
 
 const authRoutes = require('./routes/auth');
 const postsRoutes = require('./routes/posts');
@@ -23,13 +15,27 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
-// Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co',
-  process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3B5bmVhZmdocXlraWNpeXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjczNzEsImV4cCI6MjA5MTUwMzM3MX0.zTPkPVOzK-MtgaMAkdKS6gnKiI9OLJEMe0j1oUqRssw'
-);
+// Supabase clients
+const supabaseUrl = process.env.SUPABASE_URL || 'https://wkgpyneafghqykiciyxg.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3B5bmVhZmdocXlraWNpeXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjczNzEsImV4cCI6MjA5MTUwMzM3MX0.zTPkPVOzK-MtgaMAkdKS6gnKiI9OLJEMe0j1oUqRssw';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+const supabaseAdmin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'academic-waste-secret-2024';
+
+// 确保 papers 存储桶存在
+(async () => {
+  try {
+    const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+    if (!buckets?.find(b => b.name === 'papers')) {
+      await supabaseAdmin.storage.createBucket('papers', { public: false });
+      console.log('Created papers storage bucket');
+    }
+  } catch (e) {
+    console.error('Storage bucket check failed:', e.message);
+  }
+})();
 
 // 上传论文文件
 app.post('/api/upload', async (req, res) => {
@@ -52,12 +58,22 @@ app.post('/api/upload', async (req, res) => {
     }
 
     const buffer = Buffer.from(fileData, 'base64');
-    const safeFileName = `${Date.now()}-${(fileName || 'paper').replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const filePath = path.join(UPLOAD_DIR, safeFileName);
+    const safeName = `${Date.now()}-${(fileName || 'paper').replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const storagePath = `${userId}/${safeName}`;
 
-    fs.writeFileSync(filePath, buffer);
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('papers')
+      .upload(storagePath, buffer, {
+        contentType: contentType || 'application/octet-stream',
+        upsert: false
+      });
 
-    const fileUrl = `/api/files/${safeFileName}`;
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      return res.status(500).json({ error: '文件上传失败' });
+    }
+
+    const fileUrl = `/api/files/${storagePath}`;
 
     const { data: userData } = await supabase
       .from('users')
@@ -97,8 +113,8 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// 文件下载（需 JWT 认证）
-app.get('/api/files/:filename', (req, res) => {
+// 文件下载 - 从 Supabase Storage 代理（需 JWT 认证）
+app.get('/api/files/*', async (req, res) => {
   try {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -110,11 +126,35 @@ app.get('/api/files/:filename', (req, res) => {
     return res.status(401).json({ error: 'Token 无效' });
   }
 
-  const filePath = path.join(UPLOAD_DIR, req.params.filename);
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: '文件不存在' });
+  const storagePath = req.params[0];
+  if (!storagePath) {
+    return res.status(400).json({ error: '文件路径无效' });
   }
-  res.sendFile(filePath);
+
+  try {
+    const { data, error } = await supabaseAdmin.storage
+      .from('papers')
+      .download(storagePath);
+
+    if (error || !data) {
+      return res.status(404).json({ error: '文件不存在' });
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    const ext = storagePath.split('.').pop().toLowerCase();
+    const contentTypes = {
+      pdf: 'application/pdf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      doc: 'application/msword'
+    };
+
+    res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  } catch (e) {
+    console.error('File download error:', e);
+    return res.status(500).json({ error: '文件下载失败' });
+  }
 });
 
 // API Routes
