@@ -92,7 +92,6 @@ const App = {
           </div>
           <span class="slogan-line"></span>
         </div>
-        <div class="slogan-progress" :key="sloganIndex"></div>
       </div>
       <div class="main-view">
         <RouterView />

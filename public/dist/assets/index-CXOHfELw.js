@@ -920,7 +920,6 @@ var e=Object.defineProperty,t=(t,n)=>{let r={};for(var i in t)e(r,i,{get:t[i],en
           </div>
           <span class="slogan-line"></span>
         </div>
-        <div class="slogan-progress" :key="sloganIndex"></div>
       </div>
       <div class="main-view">
         <RouterView />
